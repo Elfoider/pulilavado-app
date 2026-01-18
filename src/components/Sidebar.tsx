@@ -29,7 +29,7 @@ export default function Sidebar() {
       {/* Logo / Título */}
       <div className="p-6 flex items-center gap-3 border-b border-gray-800">
         <CarFront className="w-8 h-8 text-blue-500" />
-        <span className="text-xl font-bold tracking-tight">PuliLavado</span>
+        <span className="text-xl font-bold tracking-tight">Mr. Espuma</span>
       </div>
 
       {/* Menú de Navegación */}
