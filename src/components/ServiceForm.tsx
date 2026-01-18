@@ -83,8 +83,8 @@ export default function ServiceForm() {
         clientName: client.name,
         clientPhone: client.phone,
         // Si tuvieras datos del vehículo guardados, los pondrías aquí:
-        // vehicleModel: client.lastVehicle?.model || '',
-        // vehicleColor: client.lastVehicle?.color || ''
+        vehicleModel: client.lastVehicle?.model || '',
+        vehicleColor: client.lastVehicle?.color || ''
       }));
       setSearchTerm(client.name); // Actualizar el input visual
     }
@@ -139,6 +139,7 @@ export default function ServiceForm() {
       // 3. PREPARAR OBJETO (Tipado implícito o explícito)
       const serviceData = {
         washerName: formData.washerName,
+        washerId: formData.washerId,
         clientName: formData.clientName,
         clientPhone: formData.clientPhone,
         vehicle: {

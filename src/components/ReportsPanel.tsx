@@ -7,14 +7,13 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ServiceDocument } from '@/types';
+import { FileSpreadsheet, FileText, Search } from 'lucide-react';
 
-// Estructura optimizada para el resumen totalizado
 interface WasherSummary {
   name: string;
-  count: number;          // Cantidad de carros
-  commission: number;     // Total ganado por comisión
-  tips: number;           // Total ganado en propinas
-  totalEarnings: number;  // Comisión + Propinas
+  count: number;
+  commission: number; // Esto es lo que se paga en Nómina
+  tips: number;       // Esto es solo control (ya pagado)
 }
 
 export default function ReportsPanel() {
@@ -22,16 +21,13 @@ export default function ReportsPanel() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   
-  // Datos crudos (para el archivo, por si acaso)
-  const [rawData, setRawData] = useState<ServiceDocument[]>([]);
-  
-  // Datos consolidados (1 fila por lavador)
+  // Datos procesados (1 fila por lavador)
   const [consolidatedData, setConsolidatedData] = useState<WasherSummary[]>([]);
   
   const [globalStats, setGlobalStats] = useState({
-    totalIncome: 0,   // Dinero que entró a caja (Precio servicios)
-    totalNet: 0,      // Ganancia del negocio
-    totalPayroll: 0,  // Total a repartir a empleados
+    totalServices: 0,
+    totalPayroll: 0,  // Solo Comisiones
+    totalTips: 0      // Solo Propinas
   });
 
   const handleGenerate = async () => {
@@ -54,57 +50,40 @@ export default function ReportsPanel() {
 
       const snapshot = await getDocs(q);
       const data = snapshot.docs.map(d => d.data() as ServiceDocument);
-      setRawData(data);
 
-      // --- 1. LÓGICA DE CONSOLIDACIÓN (Agrupar por nombre) ---
+      // --- LÓGICA DE AGRUPACIÓN ---
       const summaryMap: Record<string, WasherSummary> = {};
-      let gIncome = 0;
-      let gNet = 0;
-      let gPayroll = 0; // Comisión + Propina
+      let gPayroll = 0;
+      let gTips = 0;
 
       data.forEach(svc => {
-        // Normalizar nombre (quitar espacios extra)
         const name = (svc.washerName || 'Desconocido').trim();
         
         // Valores individuales
         const comm = svc.financials.washerEarnings || 0;
         const tip = svc.financials.tipAmount || 0;
-        const price = svc.financials.totalPrice || 0;
-        const business = svc.financials.businessEarnings || 0;
 
-        // Sumar a globales
-        gIncome += price;
-        gNet += business;
+        // Totales globales
+        gPayroll += comm; // Solo sumamos comisiones al total a pagar
+        gTips += tip;
         
-        // Inicializar lavador si no existe en el mapa
         if (!summaryMap[name]) {
-          summaryMap[name] = { 
-            name, 
-            count: 0, 
-            commission: 0, 
-            tips: 0, 
-            totalEarnings: 0 
-          };
+          summaryMap[name] = { name, count: 0, commission: 0, tips: 0 };
         }
 
-        // Acumular valores al lavador
         summaryMap[name].count += 1;
         summaryMap[name].commission += comm;
         summaryMap[name].tips += tip;
-        summaryMap[name].totalEarnings += (comm + tip);
       });
 
-      // Convertir Mapa a Array y ordenar por quién ganó más
-      const summaryArray = Object.values(summaryMap).sort((a, b) => b.totalEarnings - a.totalEarnings);
-      setConsolidatedData(summaryArray);
+      // Convertir a Array y ordenar por ganancia (comisión)
+      const summaryArray = Object.values(summaryMap).sort((a, b) => b.commission - a.commission);
       
-      // Calcular total de nómina real (suma de todos los totales de lavadores)
-      gPayroll = summaryArray.reduce((acc, curr) => acc + curr.totalEarnings, 0);
-
+      setConsolidatedData(summaryArray);
       setGlobalStats({
-        totalIncome: gIncome,
-        totalNet: gNet,
-        totalPayroll: gPayroll
+        totalServices: data.length,
+        totalPayroll: gPayroll,
+        totalTips: gTips
       });
 
     } catch (error) {
@@ -115,106 +94,88 @@ export default function ReportsPanel() {
     }
   };
 
-  // --- EXPORTAR EXCEL CONSOLIDADO ---
+  // --- 1. EXPORTAR EXCEL (Restaurado) ---
   const downloadExcel = () => {
     if (consolidatedData.length === 0) return;
 
     const workbook = XLSX.utils.book_new();
 
-    // HOJA 1: RESUMEN DE PAGO (Lo importante)
-    const summaryRows = consolidatedData.map(w => ({
+    // Crear filas para Excel
+    const rows = consolidatedData.map(w => ({
         Lavador: w.name,
         Autos_Lavados: w.count,
-        Total_Comision: w.commission,
-        Total_Propinas: w.tips,
-        GRAN_TOTAL_RECIBIDO: w.totalEarnings
+        Propinas_Control: w.tips, // Informativo
+        NOMINA_A_PAGAR: w.commission // Lo importante
     }));
 
-    // Agregar fila de totales al final del Excel
-    summaryRows.push({
+    // Agregar fila de Totales
+    rows.push({
         Lavador: 'TOTALES',
-        Autos_Lavados: summaryRows.reduce((a, b) => a + b.Autos_Lavados, 0),
-        Total_Comision: summaryRows.reduce((a, b) => a + b.Total_Comision, 0),
-        Total_Propinas: summaryRows.reduce((a, b) => a + b.Total_Propinas, 0),
-        GRAN_TOTAL_RECIBIDO: summaryRows.reduce((a, b) => a + b.GRAN_TOTAL_RECIBIDO, 0)
+        Autos_Lavados: rows.reduce((a, b) => a + b.Autos_Lavados, 0),
+        Propinas_Control: rows.reduce((a, b) => a + b.Propinas_Control, 0),
+        NOMINA_A_PAGAR: rows.reduce((a, b) => a + b.NOMINA_A_PAGAR, 0)
     });
 
-    const summarySheet = XLSX.utils.json_to_sheet(summaryRows);
-    XLSX.utils.book_append_sheet(workbook, summarySheet, "NÓMINA TOTALIZADA");
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    
+    // Ajustar ancho de columnas (opcional pero se ve mejor)
+    const wscols = [{wch:20}, {wch:15}, {wch:20}, {wch:20}];
+    sheet['!cols'] = wscols;
 
-    // HOJA 2: DETALLE (Opcional, por si se necesita auditar)
-    const detailRows = rawData.map(item => ({
-        Fecha: item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '',
-        Lavador: item.washerName,
-        Auto: item.vehicle.model,
-        Total: item.financials.totalPrice
-    }));
-    const detailSheet = XLSX.utils.json_to_sheet(detailRows);
-    XLSX.utils.book_append_sheet(workbook, detailSheet, "Auditoria (Detalle)");
-
-    XLSX.writeFile(workbook, `Nomina_Consolidada_${startDate}.xlsx`);
+    XLSX.utils.book_append_sheet(workbook, sheet, "Nómina Resumen");
+    XLSX.writeFile(workbook, `Nomina_PuliLavado_${startDate}.xlsx`);
   };
 
-  // --- EXPORTAR PDF CONSOLIDADO ---
+  // --- 2. EXPORTAR PDF ---
   const downloadPDF = () => {
     if (consolidatedData.length === 0) return;
 
     const doc = new jsPDF();
     
-    // Encabezado
     doc.setFontSize(16);
-    doc.text("Resumen de Nómina - Pulilavado", 14, 20);
+    doc.text("Reporte de Nómina - Comisiones", 14, 20);
     doc.setFontSize(10);
     doc.text(`Periodo: ${startDate} al ${endDate}`, 14, 28);
 
-    // Caja de Resumen Financiero del Negocio
-    doc.setDrawColor(200);
-    doc.setFillColor(245, 245, 245);
-    doc.rect(14, 35, 180, 20, 'F');
-    doc.rect(14, 35, 180, 20, 'S'); // Borde
+    // Nota de advertencia sobre propinas
+    doc.setTextColor(100);
+    doc.setFontSize(8);
+    doc.text("NOTA: Las propinas se muestran solo como referencia y NO se suman al total de nómina.", 14, 35);
+    doc.setTextColor(0);
 
-    doc.setFont("helvetica", "bold");
-    doc.text(`Ingresos Negocio: $${globalStats.totalNet.toFixed(2)}`, 20, 48);
-    doc.text(`Total a Pagar Empleados: $${globalStats.totalPayroll.toFixed(2)}`, 100, 48);
-    doc.setFont("helvetica", "normal");
-
-    // TABLA PRINCIPAL (CONSOLIDADA)
-    doc.text("DETALLE DE PAGOS (TOTALIZADO POR LAVADOR):", 14, 65);
-
+    // Tabla Principal
     const tableRows = consolidatedData.map(w => [
         w.name,
         w.count,
-        `$${w.commission.toFixed(2)}`,
-        `$${w.tips.toFixed(2)}`,
-        `$${w.totalEarnings.toFixed(2)}` // Columna Negrita (lógica visual)
+        `$${w.commission.toFixed(2)}`
     ]);
 
     autoTable(doc, {
-      startY: 70,
-      head: [['Lavador', 'Autos', 'Comisión', 'Propinas', 'TOTAL A PAGAR']],
+      startY: 40,
+      head: [['Lavador', 'Autos', 'A PAGAR (Nómina)']],
       body: tableRows,
       theme: 'grid',
-      headStyles: { fillColor: [41, 128, 185], halign: 'center' }, // Azul
+      headStyles: { fillColor: [30, 41, 59] }, // Gris oscuro
       columnStyles: {
-        0: { fontStyle: 'bold' }, // Nombre en negrita
-        4: { fontStyle: 'bold', fillColor: [240, 255, 240] } // Columna Total con fondo verde claro
+        2: { fontStyle: 'bold', fillColor: [220, 252, 231], textColor: [21, 128, 61] } // Nómina Verde
       },
       foot: [[
         'TOTALES',
-        consolidatedData.reduce((a,b)=>a+b.count,0),
-        `$${consolidatedData.reduce((a,b)=>a+b.commission,0).toFixed(2)}`,
-        `$${consolidatedData.reduce((a,b)=>a+b.tips,0).toFixed(2)}`,
+        globalStats.totalServices,
         `$${globalStats.totalPayroll.toFixed(2)}`
       ]],
-      footStyles: { fillColor: [200, 200, 200], textColor: [0,0,0], fontStyle: 'bold' }
+      footStyles: { fillColor: [240, 240, 240], textColor: [0,0,0], fontStyle: 'bold' }
     });
 
-    doc.save(`Nomina_Totalizada_${startDate}.pdf`);
+    doc.save(`Nomina_Resumen_${startDate}.pdf`);
   };
 
   return (
     <div className="p-6 bg-white rounded-xl shadow border space-y-6">
-      <h2 className="text-xl font-bold text-gray-800">Reporte de Nómina Consolidado</h2>
+      <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+        <FileText className="w-6 h-6 text-blue-600" />
+        Reportes y Nómina
+      </h2>
       
       {/* Filtros */}
       <div className="flex flex-col md:flex-row gap-4 items-end bg-gray-50 p-4 rounded-lg border">
@@ -229,64 +190,90 @@ export default function ReportsPanel() {
         <button 
             onClick={handleGenerate} 
             disabled={loading} 
-            className="bg-gray-900 text-white px-6 py-2 rounded font-bold hover:bg-gray-800 w-full md:w-auto"
+            className="bg-gray-900 text-white px-6 py-2 rounded font-bold hover:bg-gray-800 w-full md:w-auto flex items-center justify-center gap-2"
         >
-            {loading ? 'Calculando...' : 'Ver Totales'}
+            <Search className="w-4 h-4" />
+            {loading ? '...' : 'Generar Tabla'}
         </button>
       </div>
 
-      {/* Visualización en Pantalla (Tabla resumen simple) */}
+      {/* Resultados */}
       {consolidatedData.length > 0 && (
-        <div className="animate-in fade-in space-y-4">
+        <div className="animate-in fade-in space-y-6">
             
-            {/* Tarjetas Top */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-600 text-white p-4 rounded-xl shadow-lg">
-                    <p className="text-blue-100 text-xs font-bold uppercase">Total a Repartir (Nómina)</p>
-                    <p className="text-3xl font-bold">${globalStats.totalPayroll.toFixed(2)}</p>
+            {/* Tarjetas Resumen */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-green-600 text-white p-5 rounded-xl shadow-lg flex flex-col justify-between">
+                    <p className="text-green-100 text-xs font-bold uppercase tracking-wider">Total Nómina a Pagar</p>
+                    <p className="text-3xl font-extrabold mt-1">${globalStats.totalPayroll.toFixed(2)}</p>
+                    <p className="text-xs text-green-200 mt-2">* Solo Comisiones</p>
                 </div>
-                <div className="bg-white border p-4 rounded-xl shadow-sm">
-                    <p className="text-gray-400 text-xs font-bold uppercase">Ganancia Neta Local</p>
-                    <p className="text-3xl font-bold text-gray-800">${globalStats.totalNet.toFixed(2)}</p>
+                <div className="bg-yellow-50 border border-yellow-200 p-5 rounded-xl shadow-sm">
+                    <p className="text-yellow-800 text-xs font-bold uppercase tracking-wider">Control Propinas</p>
+                    <p className="text-3xl font-bold text-yellow-700 mt-1">${globalStats.totalTips.toFixed(2)}</p>
+                    <p className="text-xs text-yellow-600 mt-2">* Ya pagadas por cliente</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 p-5 rounded-xl shadow-sm">
+                    <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Servicios Realizados</p>
+                    <p className="text-3xl font-bold text-gray-800 mt-1">{globalStats.totalServices}</p>
                 </div>
             </div>
 
-            {/* Tabla Consolidada */}
-            <div className="border rounded-lg overflow-hidden shadow-sm">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
-                        <tr>
-                            <th className="px-4 py-3">Lavador</th>
-                            <th className="px-4 py-3 text-center">Autos</th>
-                            <th className="px-4 py-3 text-right">Comisión</th>
-                            <th className="px-4 py-3 text-right">Propinas</th>
-                            <th className="px-4 py-3 text-right bg-green-50 text-green-800">Total a Pagar</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                        {consolidatedData.map((w, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-bold text-gray-800">{w.name}</td>
-                                <td className="px-4 py-3 text-center text-gray-500">{w.count}</td>
-                                <td className="px-4 py-3 text-right text-gray-600">${w.commission.toFixed(2)}</td>
-                                <td className="px-4 py-3 text-right text-yellow-600 font-medium">${w.tips.toFixed(2)}</td>
-                                <td className="px-4 py-3 text-right font-bold text-green-700 bg-green-50 text-lg">
-                                    ${w.totalEarnings.toFixed(2)}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Botones de Descarga */}
-            <div className="flex gap-4 pt-2">
-                <button onClick={downloadExcel} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow transition">
+            {/* Botones de Descarga (AQUÍ ESTÁ EL DE EXCEL) */}
+            <div className="flex flex-col sm:flex-row gap-3">
+                <button 
+                    onClick={downloadExcel} 
+                    className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2"
+                >
+                    <FileSpreadsheet className="w-5 h-5" />
                     Descargar Excel
                 </button>
-                <button onClick={downloadPDF} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow transition">
+                <button 
+                    onClick={downloadPDF} 
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2"
+                >
+                    <FileText className="w-5 h-5" />
                     Descargar PDF
                 </button>
+            </div>
+
+            {/* Tabla Visual */}
+            <div className="border rounded-xl overflow-hidden shadow-sm">
+                <div className="bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600 uppercase">
+                    Vista Previa de Nómina
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-white border-b text-gray-500 uppercase text-xs">
+                            <tr>
+                                <th className="px-4 py-3">Lavador</th>
+                                <th className="px-4 py-3 text-center">Autos</th>
+
+                                <th className="px-4 py-3 text-right bg-green-50 text-green-800">A PAGAR</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {consolidatedData.map((w, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-bold text-gray-800">{w.name}</td>
+                                    <td className="px-4 py-3 text-center text-gray-500">{w.count}</td>
+
+                                    <td className="px-4 py-3 text-right font-bold text-green-700 bg-green-50 text-base">
+                                        ${w.commission.toFixed(2)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 font-bold text-gray-700">
+                             <tr>
+                                <td className="px-4 py-3">TOTALES</td>
+                                <td className="px-4 py-3 text-center">{globalStats.totalServices}</td>
+
+                                <td className="px-4 py-3 text-right text-green-700">${globalStats.totalPayroll.toFixed(2)}</td>
+                             </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
         </div>
       )}

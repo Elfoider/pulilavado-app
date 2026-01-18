@@ -4,6 +4,7 @@ export type PaymentMethod = "efectivo" | "yappy";
 
 export interface ServiceFormData {
   washerName: string;
+  washerId: string;
   clientName: string;
   clientPhone: string;
   vehicleModel: string;
