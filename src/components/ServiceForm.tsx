@@ -158,31 +158,15 @@ export default function ServiceForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* SECCIÓN 1: DATOS OPERATIVOS */}
-        <div className="grid grid-cols-2 gap-4">
-          <select
-            name="washerId"
-            className="border p-2 rounded w-full"
-            onChange={(e) => {
-              const selectedId = e.target.value;
-              const selectedWasher = washersList.find(
-                (w) => w.id === selectedId
-              );
-              // Guardamos tanto el ID como el Nombre para evitar lecturas extra luego
-              setFormData((prev) => ({
-                ...prev,
-                washerId: selectedId,
-                washerName: selectedWasher?.name || "",
-              }));
-            }}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <input
+            name="washerName"
+            placeholder="Nombre Lavador"
             required
-          >
-            <option value="">Seleccionar Lavador</option>
-            {washersList.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
+            value={formData.washerName}
+            className="border p-2 rounded"
+            onChange={handleChange}
+          />
           <input
             name="bayNumber"
             placeholder="# Pista (1-5)"
@@ -195,7 +179,7 @@ export default function ServiceForm() {
         </div>
 
         {/* SECCIÓN 2: VEHÍCULO */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <input
             name="vehicleModel"
             placeholder="Modelo Vehículo"
@@ -216,7 +200,7 @@ export default function ServiceForm() {
 
         {/* SECCIÓN 3: CLIENTE */}
         <div className="border-t pt-4">
-          <div className="grid grid-cols-2 gap-4 mb-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
             <input
               name="clientName"
               placeholder="Nombre Cliente"

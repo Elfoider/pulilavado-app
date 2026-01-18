@@ -23,7 +23,7 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <div className="w-64 bg-gray-900 text-white h-screen flex flex-col fixed left-0 top-0 border-r border-gray-800">
+    <div className="hidden md:flex w-64 bg-gray-900 text-white h-screen flex-col fixed left-0 top-0 border-r border-gray-800 z-50">
       {/* Logo / Título */}
       <div className="p-6 flex items-center gap-3 border-b border-gray-800">
         <CarFront className="w-8 h-8 text-blue-500" />

@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Define una interfaz para las variables de entorno para mayor seguridad (opcional)
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: "AIzaSyCBaQcCu1YeHXoJYJ2qhWteg-wIChL8dOA",
+  authDomain: "mrespumasystem.firebaseapp.com",
+  projectId: "mrespumasystem",
+  storageBucket: "mrespumasystem.firebasestorage.app",
+  messagingSenderId: "889894946879",
+  appId: "1:889894946879:web:b2d9864c85bd6ae375108a"
 };
 
 const app = initializeApp(firebaseConfig);
