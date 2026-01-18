@@ -11,14 +11,26 @@ import {
   query,
   where,
   getDocs,
+  orderBy,
 } from "firebase/firestore";
 import { ServiceFormData, PaymentMethod, Washer } from "@/types"; // Asegúrate de importar tus tipos
+
+interface ClientOption {
+  id: string;
+  name: string;
+  phone: string;
+  lastVehicle?: { model: string; color: string }; // Si guardaste esto antes
+}
 
 export default function ServiceForm() {
   const [loading, setLoading] = useState<boolean>(false);
   const [washersList, setWashersList] = useState<Washer[]>([]);
+  const [clientsList, setClientsList] = useState<ClientOption[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState<ServiceFormData>({
     washerName: "",
+    // @ts-ignore: Propiedad temporal para el ID
+    washerId: "",
     clientName: "",
     clientPhone: "",
     vehicleModel: "",
@@ -34,15 +46,49 @@ export default function ServiceForm() {
   });
 
   useEffect(() => {
-    const loadWashers = async () => {
-      const q = query(collection(db, "washers"), where("active", "==", true));
-      const snap = await getDocs(q);
+    const loadData = async () => {
+      // Cargar Lavadores
+      const wQuery = query(
+        collection(db, "washers"),
+        where("active", "==", true)
+      );
+      const wSnap = await getDocs(wQuery);
       setWashersList(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() } as Washer))
+        wSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Washer))
+      );
+
+      // Cargar Clientes (Para el autocompletado)
+      const cQuery = query(collection(db, "clients"), orderBy("name"));
+      const cSnap = await getDocs(cQuery);
+      setClientsList(
+        cSnap.docs.map(
+          (d) =>
+            ({
+              id: d.id,
+              name: d.data().name,
+              phone: d.data().phone,
+              lastVehicle: d.data().vehicleHistory?.[0], // Asumiendo que guardas historial
+            } as ClientOption)
+        )
       );
     };
-    loadWashers();
+    loadData();
   }, []);
+
+  const handleClientSelect = (clientId: string) => {
+    const client = clientsList.find((c) => c.id === clientId);
+    if (client) {
+      setFormData((prev) => ({
+        ...prev,
+        clientName: client.name,
+        clientPhone: client.phone,
+        // Si tuvieras datos del vehículo guardados, los pondrías aquí:
+        // vehicleModel: client.lastVehicle?.model || '',
+        // vehicleColor: client.lastVehicle?.color || ''
+      }));
+      setSearchTerm(client.name); // Actualizar el input visual
+    }
+  };
 
   // Manejador de cambios genérico tipado
   const handleChange = (
@@ -119,13 +165,17 @@ export default function ServiceForm() {
       // TypeScript infiere los tipos aquí, pero sabe que collection espera referencias válidas
       await addDoc(collection(db, "services"), serviceData);
 
-      // 5. CLIENTE FRECUENTE
+      // Si es cliente nuevo y se marca guardar
       if (formData.saveFrequent) {
         await addDoc(collection(db, "clients"), {
           name: formData.clientName,
           phone: formData.clientPhone,
           frequent: true,
-          lastVisit: serverTimestamp(),
+          // Guardamos el vehículo actual como referencia
+          vehicleHistory: [
+            { model: formData.vehicleModel, color: formData.vehicleColor },
+          ],
+          createdAt: serverTimestamp(),
         });
       }
 
@@ -142,6 +192,7 @@ export default function ServiceForm() {
         hasTip: false,
         tipAmount: "",
       }));
+      setSearchTerm("");
     } catch (error) {
       console.error("Error al guardar:", error);
       alert("Error al registrar servicio");
@@ -157,24 +208,68 @@ export default function ServiceForm() {
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* BUSCADOR DE CLIENTES */}
+        <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+          <label className="block text-sm font-bold text-blue-800 mb-2">
+            Buscar Cliente Existente
+          </label>
+          <input
+            list="clients-options"
+            placeholder="Escribe para buscar..."
+            className="w-full border p-2 rounded"
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              // Intentar buscar match exacto o permitir escribir nuevo
+              const match = clientsList.find((c) => c.name === e.target.value);
+              if (match) handleClientSelect(match.id);
+              else
+                setFormData((prev) => ({
+                  ...prev,
+                  clientName: e.target.value,
+                }));
+            }}
+          />
+          <datalist id="clients-options">
+            {clientsList.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.phone}
+              </option>
+            ))}
+          </datalist>
+        </div>
         {/* SECCIÓN 1: DATOS OPERATIVOS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <input
-            name="washerName"
-            placeholder="Nombre Lavador"
+          {/* Lavador */}
+          <select
+            name="washerId"
             required
-            value={formData.washerName}
             className="border p-2 rounded"
-            onChange={handleChange}
-          />
+            onChange={(e) => {
+              const w = washersList.find((x) => x.id === e.target.value);
+              setFormData((prev) => ({
+                ...prev,
+                washerId: e.target.value,
+                washerName: w?.name || "",
+              }));
+            }}
+          >
+            <option value="">Seleccionar Lavador</option>
+            {washersList.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+
           <input
             name="bayNumber"
-            placeholder="# Pista (1-5)"
-            required
             type="number"
-            value={formData.bayNumber}
+            placeholder="Pista #"
+            required
             className="border p-2 rounded"
             onChange={handleChange}
+            value={formData.bayNumber}
           />
         </div>
 
@@ -253,6 +348,8 @@ export default function ServiceForm() {
             >
               <option value="efectivo">Efectivo</option>
               <option value="yappy">Yappy</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="ach">ACH</option>
             </select>
           </div>
 
@@ -288,6 +385,8 @@ export default function ServiceForm() {
               >
                 <option value="efectivo">Efectivo</option>
                 <option value="yappy">Yappy</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="ach">ACH</option>
               </select>
             </div>
           )}

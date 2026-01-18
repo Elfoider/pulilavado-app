@@ -8,13 +8,15 @@ import {
   Users, 
   BarChart3, 
   Settings, 
-  CarFront 
+  CarFront, 
+  Heart
 } from 'lucide-react';
 
 const menuItems = [
   { name: 'Tablero Principal', href: '/', icon: LayoutDashboard },
   { name: 'Nuevo Servicio', href: '/new', icon: PlusCircle },
   { name: 'Personal / Lavadores', href: '/washers', icon: Users },
+  { name: 'Clientes', href: '/clients', icon: Heart },
   { name: 'Reportes y Finanzas', href: '/reports', icon: BarChart3 },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ];

@@ -2,113 +2,164 @@
 
 import { useEffect, useState } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, onSnapshot, limit } from 'firebase/firestore';
-import { ServiceDocument } from '@/types'; // Importamos la interfaz que creamos antes
+import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
+import { ServiceDocument } from '@/types';
+import ServiceDetailsModal from '@/components/ServiceDetailsModal'; // Asegúrate de tener este componente
 
-// Extendemos el tipo para incluir el ID que genera Firebase
 interface ServiceWithId extends ServiceDocument {
   id: string;
 }
 
-export default function ServicesTable() {
-  const [services, setServices] = useState<ServiceWithId[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function DashboardPage() {
+  const [todayServices, setTodayServices] = useState<ServiceWithId[]>([]);
+  const [stats, setStats] = useState({
+    totalEarnings: 0,
+    totalTips: 0,
+    totalCount: 0,
+    topWasher: 'Nadie aún'
+  });
+  const [selectedService, setSelectedService] = useState<ServiceWithId | null>(null);
 
-  useEffect(() => {
-    // Consulta: Servicios ordenados por fecha (más reciente primero)
-    // Limitamos a 50 para no sobrecargar la vista inicial
-    const q = query(
-      collection(db, "services"),
-      orderBy("createdAt", "desc"),
-      limit(50)
-    );
+    const calculateDailyStats = (services: ServiceWithId[]) => {
+    let earnings = 0;
+    let tips = 0;
+    const washerMap: Record<string, number> = {};
 
-    // Suscripción en tiempo real
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const servicesArray: ServiceWithId[] = [];
+    services.forEach(svc => {
+      earnings += svc.financials.totalPrice; // O businessEarnings si quieres solo la ganancia neta
+      tips += svc.financials.tipAmount || 0;
       
-      querySnapshot.forEach((doc) => {
-        // Forzamos el tipo aquí
-        servicesArray.push({ id: doc.id, ...doc.data() } as ServiceWithId);
-      });
-
-      setServices(servicesArray);
-      setLoading(false);
+      // Contar para el mejor lavador (sumando sus ganancias)
+      const wName = svc.washerName;
+      if (!washerMap[wName]) washerMap[wName] = 0;
+      washerMap[wName] += svc.financials.washerEarnings;
     });
 
-    // Limpieza al desmontar el componente
+    // Encontrar lavador con más ganancias hoy
+    let topName = 'Nadie aún';
+    let maxEarn = 0;
+    Object.entries(washerMap).forEach(([name, amount]) => {
+      if (amount > maxEarn) {
+        maxEarn = amount;
+        topName = name;
+      }
+    });
+
+    setStats({
+      totalEarnings: earnings,
+      totalTips: tips,
+      totalCount: services.length,
+      topWasher: topName
+    });
+  };
+
+  useEffect(() => {
+    // 1. Calcular rango de tiempo para "HOY"
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // 2. Query en tiempo real filtrado por fecha
+    const q = query(
+      collection(db, "services"),
+      where("createdAt", ">=", Timestamp.fromDate(startOfDay)),
+      where("createdAt", "<=", Timestamp.fromDate(endOfDay)),
+      orderBy("createdAt", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ServiceWithId));
+      setTodayServices(data);
+      calculateDailyStats(data);
+    });
+
     return () => unsubscribe();
   }, []);
 
-  if (loading) return <div className="p-4 text-center">Cargando servicios...</div>;
-
   return (
-    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-      <div className="p-4 border-b flex justify-between items-center">
-        <h3 className="font-bold text-lg">Historial de Servicios Recientes</h3>
-        <span className="text-sm text-gray-500">{services.length} registros</span>
-      </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
-            <tr>
-              <th className="px-4 py-3">Fecha/Hora</th>
-              <th className="px-4 py-3">Pista</th>
-              <th className="px-4 py-3">Vehículo</th>
-              <th className="px-4 py-3">Lavador</th>
-              <th className="px-4 py-3">Total ($)</th>
-              <th className="px-4 py-3 text-center">Detalles</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {services.map((service) => (
-              <tr key={service.id} className="hover:bg-gray-50 transition">
-                <td className="px-4 py-3 text-gray-600">
-                  {/* Manejo seguro de la fecha de Firebase timestamp */}
-                  {service.createdAt?.seconds 
-                    ? new Date(service.createdAt.seconds * 1000).toLocaleString('es-PA', { 
-                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
-                      }) 
-                    : 'Pendiente...'}
-                </td>
-                <td className="px-4 py-3 font-medium">
-                  <span className="bg-blue-100 text-blue-800 py-1 px-2 rounded-full text-xs">
-                    #{service.vehicle.bay}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">{service.vehicle.model}</div>
-                  <div className="text-xs text-gray-500">{service.vehicle.color}</div>
-                </td>
-                <td className="px-4 py-3">{service.washerName}</td>
-                <td className="px-4 py-3 font-bold text-gray-900">
-                  ${service.financials.totalPrice.toFixed(2)}
-                  <div className="text-xs font-normal text-gray-500 uppercase">
-                    {service.financials.paymentMethod}
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <button 
-                    onClick={() => alert(`Detalles del servicio ID: ${service.id}\nObservaciones: ${service.observations}`)}
-                    className="text-blue-600 hover:underline hover:text-blue-800 font-medium"
-                  >
-                    Ver más
-                  </button>
-                </td>
-              </tr>
-            ))}
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold text-gray-800">Resumen del Día</h1>
 
-            {services.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  No hay servicios registrados hoy.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {/* TARJETAS DE MÉTRICAS (KPIs) */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-blue-500">
+          <p className="text-gray-500 text-xs font-bold uppercase">Ventas Totales Hoy</p>
+          <p className="text-2xl font-bold">${stats.totalEarnings.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-yellow-500">
+          <p className="text-gray-500 text-xs font-bold uppercase">Propinas Hoy</p>
+          <p className="text-2xl font-bold text-yellow-700">${stats.totalTips.toFixed(2)}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-green-500">
+          <p className="text-gray-500 text-xs font-bold uppercase">Mejor Lavador Hoy</p>
+          <p className="text-xl font-bold text-green-700 truncate">{stats.topWasher}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-purple-500">
+          <p className="text-gray-500 text-xs font-bold uppercase">Carros Lavados</p>
+          <p className="text-2xl font-bold text-purple-700">{stats.totalCount}</p>
+        </div>
       </div>
+
+      {/* TABLA DE SERVICIOS DE HOY */}
+      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div className="p-4 border-b font-bold text-gray-700">Bitácora de Hoy</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+              <tr>
+                <th className="px-4 py-3">Hora</th>
+                <th className="px-4 py-3">Vehículo</th>
+                <th className="px-4 py-3">Lavador</th>
+                <th className="px-4 py-3">Precio</th>
+                <th className="px-4 py-3">Propina</th>
+                <th className="px-4 py-3 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {todayServices.map((svc) => (
+                <tr key={svc.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    {svc.createdAt?.seconds 
+                      ? new Date(svc.createdAt.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                      : '--:--'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="font-bold">{svc.vehicle.model}</div>
+                    <div className="text-xs text-gray-500">{svc.vehicle.color} (Pista {svc.vehicle.bay})</div>
+                  </td>
+                  <td className="px-4 py-3">{svc.washerName}</td>
+                  <td className="px-4 py-3 font-bold text-blue-700">
+                    ${svc.financials.totalPrice.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 font-medium text-yellow-700">
+                    {svc.financials.tipAmount > 0 
+                      ? `$${svc.financials.tipAmount.toFixed(2)}` 
+                      : <span className="text-gray-300">N/A</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <button 
+                      onClick={() => setSelectedService(svc)}
+                      className="text-blue-600 hover:underline font-bold"
+                    >
+                      Ver
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {todayServices.length === 0 && (
+                <tr><td colSpan={6} className="text-center py-8 text-gray-400">Sin servicios hoy</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL (Reutilizamos el que ya tenías) */}
+      {selectedService && (
+        <ServiceDetailsModal service={selectedService} onClose={() => setSelectedService(null)} />
+      )}
     </div>
   );
 }
