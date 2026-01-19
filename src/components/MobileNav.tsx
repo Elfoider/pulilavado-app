@@ -26,7 +26,7 @@ export default function MobileNav() {
       {/* Logo y Botón */}
       <div className="flex items-center gap-2 font-bold text-lg">
         <CarFront className="text-blue-500" />
-        <span>PuliLavado</span>
+        <span>Mr. Espuma</span>
       </div>
       
       <button onClick={() => setIsOpen(!isOpen)} className="p-1">

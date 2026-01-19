@@ -1,6 +1,6 @@
 // src/types/index.ts
 
-export type PaymentMethod = "efectivo" | "yappy";
+export type PaymentMethod = "efectivo" | "yappy" | "tarjeta" | "Transferencia";
 
 export interface ServiceFormData {
   washerName: string;
