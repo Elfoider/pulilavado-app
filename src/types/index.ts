@@ -30,6 +30,7 @@ export interface Washer {
 
 // Así es como se guardará en Firestore
 export interface ServiceDocument {
+  paymentMethod: string;
   washerId: string;
   washerName: string;
   clientName: string;
