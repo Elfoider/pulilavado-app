@@ -1,3 +1,33 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+:root {
+  /* Paleta Oficial Mr. Espuma */
+  --espuma-red: #D62828;    /* Rojo del Auto */
+  --espuma-blue: #00B4D8;   /* Azul de la Espuma (Cyan) */
+  --espuma-light: #90E0EF;  /* Azul muy claro */
+  --espuma-yellow: #FCA311; /* Amarillo Boquilla */
+  --espuma-dark: #023047;   /* Azul Oscuro (Fondos) */
+}
+
+/* --- CLASES DE UTILIDAD PERSONALIZADAS --- */
+
+/* Fondos */
+.bg-espuma-red { background-color: var(--espuma-red); }
+.bg-espuma-blue { background-color: var(--espuma-blue); }
+.bg-espuma-dark { background-color: var(--espuma-dark); }
+.bg-espuma-yellow { background-color: var(--espuma-yellow); }
+
+/* Textos */
+.text-espuma-red { color: var(--espuma-red); }
+.text-espuma-blue { color: var(--espuma-blue); }
+.text-espuma-dark { color: var(--espuma-dark); }
+.text-espuma-yellow { color: var(--espuma-yellow); }
+
+/* Bordes */
+.border-espuma-red { border-color: var(--espuma-red); }
+.border-espuma-blue { border-color: var(--espuma-blue); }
+
+/* Hover Effects (Opcionales para botones) */
+.hover-bg-espuma-blue:hover { background-color: #0096B4; /* Un poco más oscuro */ }
+.hover-bg-espuma-red:hover { background-color: #B51F1F; }

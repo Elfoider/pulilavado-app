@@ -8,7 +8,7 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold text-gray-800">Tablero Principal</h1>
         <Link 
           href="/new" 
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          className="bg-espuma-blue hover-bg-espuma-blue text-white px-4 py-2 rounded-lg transition"
         >
           + Nuevo Servicio
         </Link>

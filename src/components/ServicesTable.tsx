@@ -40,7 +40,7 @@ export default function DashboardPage() {
     });
     const washerMap: Record<
       string,
-      { name: string; count: number; total: number }
+      { name: string; count: number; total: number, tips: number }
     > = {};
 
     services.forEach((svc) => {
@@ -50,10 +50,12 @@ export default function DashboardPage() {
       // Usualmente en dashboard principal se muestra Venta Total o Comisión.
       // Pondré Comisión ganada por él hoy.
       const money = svc.financials.washerEarnings;
+      const tipMoney = svc.financials.tipAmount || 0;
 
-      if (!washerMap[name]) washerMap[name] = { name, count: 0, total: 0 };
+      if (!washerMap[name]) washerMap[name] = { name, count: 0, total: 0, tips: 0 };
       washerMap[name].count += 1;
       washerMap[name].total += money;
+      washerMap[name].tips += tipMoney;
     });
 
     setWasherDailyStats(Object.values(washerMap));
@@ -108,8 +110,8 @@ export default function DashboardPage() {
       <h1 className="text-3xl font-bold text-gray-800">Resumen del Día</h1>
 
       {/* TARJETAS DE MÉTRICAS (KPIs) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-blue-500">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-transparent p-4 rounded-xl shadow border border-l-4 border-l-blue-500">
           <p className="text-gray-500 text-xs font-bold uppercase">
             Ventas Totales Hoy
           </p>
@@ -117,7 +119,7 @@ export default function DashboardPage() {
             ${stats.totalEarnings.toFixed(2)}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-yellow-500">
+        <div className="bg-transparent p-4 rounded-xl shadow border border-l-4 border-l-yellow-500">
           <p className="text-gray-500 text-xs font-bold uppercase">
             Propinas Hoy
           </p>
@@ -125,7 +127,7 @@ export default function DashboardPage() {
             ${stats.totalTips.toFixed(2)}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-green-500">
+        <div className="bg-transparent p-4 rounded-xl shadow border border-l-4 border-l-green-500">
           <p className="text-gray-500 text-xs font-bold uppercase">
             Mejor Lavador Hoy
           </p>
@@ -133,7 +135,7 @@ export default function DashboardPage() {
             {stats.topWasher}
           </p>
         </div>
-        <div className="bg-white p-4 rounded-xl shadow border border-l-4 border-l-purple-500">
+        <div className="bg-transparent p-4 rounded-xl shadow border border-l-4 border-l-purple-500">
           <p className="text-gray-500 text-xs font-bold uppercase">
             Carros Lavados
           </p>
@@ -153,7 +155,7 @@ export default function DashboardPage() {
             {washerDailyStats.map((w, idx) => (
               <div
                 key={idx}
-                className="bg-white p-3 rounded-lg shadow-sm border border-l-4 border-l-blue-400 flex flex-col justify-between"
+                className="bg-transparent p-3 rounded-lg shadow-sm border border-l-4 border-l-blue-400 flex flex-col justify-between"
               >
                 <div>
                   <p className="font-bold text-gray-800 truncate">{w.name}</p>
@@ -162,11 +164,23 @@ export default function DashboardPage() {
                     <span>{w.count} autos</span>
                   </div>
                 </div>
-                <div className="mt-2 text-right">
-                  <p className="text-xs text-gray-400 uppercase">Ganado Hoy</p>
-                  <p className="font-bold text-green-600">
-                    ${w.total.toFixed(2)}
-                  </p>
+                <div className="mt-2 flex flex-row justify-between">
+                  <div className="flex flex-col items-start">
+                    <p className="text-xs text-gray-400 uppercase">
+                      Propina de Hoy
+                    </p>
+                    <p className="font-bold text-green-600">
+                      ${w.tips.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <p className="text-xs text-gray-400 uppercase">
+                      Ganado Hoy
+                    </p>
+                    <p className="font-bold text-green-600">
+                      ${w.total.toFixed(2)}
+                    </p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -175,13 +189,13 @@ export default function DashboardPage() {
       )}
 
       {/* TABLA DE SERVICIOS DE HOY */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-transparent rounded-xl shadow-sm border overflow-hidden">
         <div className="p-4 border-b font-bold text-gray-700">
           Bitácora de Hoy
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
-            <thead className="bg-gray-50 text-gray-700 font-semibold uppercase text-xs">
+            <thead className="bg-transparent text-gray-700 font-semibold uppercase text-xs">
               <tr>
                 <th className="px-4 py-3">Hora</th>
                 <th className="px-4 py-3">Vehículo</th>
@@ -191,9 +205,9 @@ export default function DashboardPage() {
                 <th className="px-4 py-3 text-center">Acción</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-transparent">
               {todayServices.map((svc) => (
-                <tr key={svc.id} className="hover:bg-gray-50">
+                <tr key={svc.id} className="hover:backdrop-blur-xs">
                   <td className="px-4 py-3">
                     {svc.createdAt?.seconds
                       ? new Date(

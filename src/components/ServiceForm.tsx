@@ -50,11 +50,11 @@ export default function ServiceForm() {
       // Cargar Lavadores
       const wQuery = query(
         collection(db, "washers"),
-        where("active", "==", true)
+        where("active", "==", true),
       );
       const wSnap = await getDocs(wQuery);
       setWashersList(
-        wSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Washer))
+        wSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as Washer),
       );
 
       // Cargar Clientes (Para el autocompletado)
@@ -68,8 +68,8 @@ export default function ServiceForm() {
               name: d.data().name,
               phone: d.data().phone,
               lastVehicle: d.data().vehicleHistory?.[0], // Asumiendo que guardas historial
-            } as ClientOption)
-        )
+            }) as ClientOption,
+        ),
       );
     };
     loadData();
@@ -83,8 +83,8 @@ export default function ServiceForm() {
         clientName: client.name,
         clientPhone: client.phone,
         // Si tuvieras datos del vehículo guardados, los pondrías aquí:
-        vehicleModel: client.lastVehicle?.model || '',
-        vehicleColor: client.lastVehicle?.color || ''
+        vehicleModel: client.lastVehicle?.model || "",
+        vehicleColor: client.lastVehicle?.color || "",
       }));
       setSearchTerm(client.name); // Actualizar el input visual
     }
@@ -94,7 +94,7 @@ export default function ServiceForm() {
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const target = e.target;
     const { name, value, type } = target;
@@ -185,13 +185,21 @@ export default function ServiceForm() {
       // Limpiar formulario (reseteo parcial)
       setFormData((prev) => ({
         ...prev,
-        price: "",
-        vehicleModel: "",
-        vehicleColor: "",
+        washerName: "",
+        // @ts-ignore: Propiedad temporal para el ID
+        washerId: "",
         clientName: "",
         clientPhone: "",
+        vehicleModel: "",
+        vehicleColor: "",
+        bayNumber: "",
+        price: "",
+        paymentMethod: "efectivo",
         hasTip: false,
         tipAmount: "",
+        tipMethod: "efectivo",
+        saveFrequent: false,
+        observations: "",
       }));
       setSearchTerm("");
     } catch (error) {
