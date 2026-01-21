@@ -50,6 +50,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
     washerId: "",
     tipAmount: 0,
     tipMethod: "Efectivo",
+    vehicleBay: "",
   });
 
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         washerId: service.washerId || "",
         tipAmount: service.financials?.tipAmount || 0,
         tipMethod: service.financials?.tipMethod || "Efectivo",
+        vehicleBay: service.vehicle?.bay || "",
       });
     }
 
@@ -131,6 +133,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         clientPhone: formData.clientPhone,
         "vehicle.model": formData.vehicleModel,
         "vehicle.color": formData.vehicleColor,
+        "vehicle.bay": formData.vehicleBay,
         "financials.totalPrice": formData.price,
         "financials.washerEarnings": washerEarnings,
         "financials.businessEarnings": businessEarnings,
@@ -253,6 +256,29 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                     className="w-full p-2 border rounded-lg bg-gray-50 font-medium"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase">
+                  Pista
+                </label>
+                <select
+                  required
+                  value={formData.vehicleBay}
+                  onChange={(e) => setFormData({ ...formData, vehicleBay: e.target.value })}
+                  className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
+                >
+                  <option value="0">Seleccionar...</option>
+                  <option value="1">Pista #1</option>
+                  <option value="2">Pista #2</option>
+                  <option value="3">Pista #3</option>
+                  <option value="4">Pista #4</option>
+                  <option value="5">Pista #5</option>
+                  <option value="6">Pista #6</option>
+                  <option value="7">Pista #7</option>
+                  <option value="8">Pista #8</option>
+                  <option value="9">Pista #9</option>
+                  <option value="10">Pista #10</option>
+                </select>
               </div>
 
               {/* STATUS DE PAGO (NUEVO CONTROL) */}
@@ -428,6 +454,14 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                   </p>
                   <p className="font-bold text-gray-800">
                     {formData.vehicleColor}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-400 uppercase">
+                    Pista
+                  </p>
+                  <p className="font-bold text-gray-800">
+                    {formData.vehicleBay ? `#${formData.vehicleBay}` : "N/A"}
                   </p>
                 </div>
               </div>
