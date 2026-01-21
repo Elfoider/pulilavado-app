@@ -52,6 +52,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
   const [commissionPercent, setCommissionPercent] = useState(35); // Por defecto 35%
 
   // --- ESTADOS DEL FORMULARIO ---
+  const [track, setTrack] = useState("0");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
@@ -97,7 +98,9 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           // 3. CARGAR COMISIÓN GLOBAL (NUEVO)
           const settingsSnap = await getDoc(doc(db, "settings", "global"));
           if (settingsSnap.exists()) {
-            setCommissionPercent(settingsSnap.data()?.defaultCommissionPercentage || 40);
+            setCommissionPercent(
+              settingsSnap.data()?.defaultCommissionPercentage || 40,
+            );
           }
         } catch (error) {
           console.error(error);
@@ -253,23 +256,48 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
 
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
           {/* 1. SELECCIÓN DE LAVADOR */}
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-              Lavador Asignado *
-            </label>
-            <select
-              required
-              value={selectedWasherId}
-              onChange={(e) => setSelectedWasherId(e.target.value)}
-              className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
-            >
-              <option value="">Seleccionar...</option>
-              {washers.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Lavador Asignado *
+              </label>
+              <select
+                required
+                value={selectedWasherId}
+                onChange={(e) => setSelectedWasherId(e.target.value)}
+                className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
+              >
+                <option value="">Seleccionar...</option>
+                {washers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Pista *
+              </label>
+              <select
+                required
+                value={track}
+                onChange={(e) => setTrack(e.target.value)}
+                className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
+              >
+                <option value="0">Seleccionar...</option>
+                <option value="1">Pista #1</option>
+                <option value="2">Pista #2</option>
+                <option value="3">Pista #3</option>
+                <option value="4">Pista #4</option>
+                <option value="5">Pista #5</option>
+                <option value="6">Pista #6</option>
+                <option value="7">Pista #7</option>
+                <option value="8">Pista #8</option>
+                <option value="9">Pista #9</option>
+                <option value="10">Pista #10</option>
+              </select>
+            </div>
           </div>
 
           {/* 2. DATOS DEL CLIENTE */}
@@ -313,21 +341,21 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
                 </div>
               )}
             </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                  Teléfono
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-                  <input
-                    type="tel"
-                    placeholder="6xxx-xxxx"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-medium text-gray-800 outline-none"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Teléfono
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <input
+                  type="tel"
+                  placeholder="6xxx-xxxx"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-medium text-gray-800 outline-none"
+                />
               </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
