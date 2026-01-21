@@ -10,10 +10,6 @@ import {
   History
 } from "lucide-react";
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
 export const menuItems = [
   { name: "Tablero Principal", href: "/", icon: LayoutDashboard },
   { name: 'Historial', href: '/history', icon: History },
@@ -23,3 +19,16 @@ export const menuItems = [
   { name: "Reportes y Finanzas", href: "/reports", icon: BarChart3 },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+export function capitalizarPrimeraLetra(cadena: string): string {
+  if (!cadena) { // Verifica si la cadena está vacía o es nula
+    return cadena;
+  }
+  return cadena.charAt(0).toUpperCase() + cadena.slice(1);
+}
+
+

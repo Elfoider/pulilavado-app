@@ -19,7 +19,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [washers, setWashers] = useState<Washer[]>([]);
-  const [commissionPercent, setCommissionPercent] = useState(40); 
+  const [commissionPercent, setCommissionPercent] = useState(35); 
 
   const [formData, setFormData] = useState({
     clientName: '',
@@ -58,7 +58,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         const snapConfig = await getDocs(collection(db, "settings"));
         if (!snapConfig.empty) {
             const configData = snapConfig.docs[0].data();
-            if (configData.washerCommission) setCommissionPercent(configData.washerCommission);
+            if (configData.defaultCommissionPercentage) setCommissionPercent(configData.defaultCommissionPercentage);
         }
     };
     initData();

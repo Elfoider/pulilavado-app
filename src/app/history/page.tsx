@@ -17,6 +17,7 @@ import {
   Eye,
   ArrowRight
 } from 'lucide-react';
+import { capitalizarPrimeraLetra } from '@/lib/utils';
 
 interface ServiceWithId extends ServiceDocument {
   id: string;
@@ -83,19 +84,19 @@ export default function HistoryPage() {
       data.forEach(svc => {
         const total = svc.financials.totalPrice || 0;
         income += total;
-        
-        const method = svc.paymentMethod || 'Efectivo';
+        console.log(`Servicio ID: ${svc.id}, Monto: ${total}, Método: ${svc.financials.paymentMethod}`);
+        const method = svc.financials.paymentMethod;
 
-        if (method === 'Efectivo') {
+        if (method == 'Efectivo') {
             cCash++;
             aCash += total;
-        } else if (method === 'Yappy') {
+        } else if (method == 'Yappy') {
             cYappy++;
             aYappy += total;
-        } else if (method === 'Tarjeta') {
+        } else if (method == 'Tarjeta') {
             cCard++;
             aCard += total;
-        } else if (method === 'Transferencia') {
+        } else if (method == 'Transferencia') {
             cACH++;
             aACH += total;
         }
@@ -253,12 +254,13 @@ export default function HistoryPage() {
                     </td>
                     <td className="px-6 py-4">
                          <span className={`px-2 py-1 rounded text-xs font-bold border ${
-                            svc.paymentMethod === 'Efectivo' ? 'bg-green-100 text-green-700 border-green-200' :
-                            svc.paymentMethod === 'Yappy' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' :
-                            svc.paymentMethod === 'Tarjeta' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                            capitalizarPrimeraLetra(svc.financials.paymentMethod) === 'Efectivo' ? 'bg-green-100 text-green-700 border-green-200' :
+                            capitalizarPrimeraLetra(svc.financials.paymentMethod) === 'Yappy' ? 'bg-cyan-100 text-cyan-700 border-cyan-200' :
+                            capitalizarPrimeraLetra(svc.financials.paymentMethod) === 'Tarjeta' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                            capitalizarPrimeraLetra(svc.financials.paymentMethod) === 'Pendiente' ? 'bg-red-100 text-red-700 border-red-200' :
                             'bg-gray-100 text-gray-600 border-gray-200'
                         }`}>
-                            {svc.paymentMethod || 'Efectivo'}
+                            {capitalizarPrimeraLetra(svc.financials.paymentMethod)}
                         </span>
                     </td>
                     <td className="px-6 py-4 text-right font-black text-gray-800">

@@ -49,7 +49,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // --- CONFIGURACIÓN GLOBAL ---
-  const [commissionPercent, setCommissionPercent] = useState(40); // Por defecto 40%
+  const [commissionPercent, setCommissionPercent] = useState(35); // Por defecto 35%
 
   // --- ESTADOS DEL FORMULARIO ---
   const [clientName, setClientName] = useState("");
