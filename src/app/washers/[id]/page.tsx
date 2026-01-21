@@ -1,223 +1,251 @@
-// src/app/washers/[id]/page.tsx
 "use client"
 
-import { use, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { User, DollarSign, Car, Calendar, Phone, ArrowLeft, AlertCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { 
+  ArrowLeft, Calendar, DollarSign, Car, 
+  Trophy, TrendingUp, Banknote 
+} from 'lucide-react';
 
-interface WasherData {
+interface DailyService {
   id: string;
-  name: string;
-  phone?: string;
-  active: boolean;
+  vehicle: string;
+  totalPrice: number;
+  washerEarnings: number;
+  tipAmount: number;
+  paymentMethod: string;
 }
 
-interface ServiceData {
-  id: string;
-  createdAt: any;
-  vehicle: { model: string; color: string; };
-  financials: {
-    totalPrice: number;
-    washerEarnings: number;
-    tipAmount: number;
-  };
-}
-
-export default function WasherProfilePage({ params }: { params: Promise<{ id: string }> }) {
-  // 1. Desempaquetar params con use()
-  const { id } = use(params);
-  
+export default function WasherProfilePage() {
+  const { id } = useParams(); // Obtener ID del lavador de la URL
   const router = useRouter();
-  const [washer, setWasher] = useState<WasherData | null>(null);
-  const [history, setHistory] = useState<ServiceData[]>([]);
+  
+  const [washer, setWasher] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // Métricas
-  const [stats, setStats] = useState({
-    totalEarned: 0, 
-    totalTips: 0,
-    totalCars: 0
+  // --- ESTADOS PARA MÉTRICAS DIARIAS ---
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [dailyStats, setDailyStats] = useState({
+    count: 0,
+    earnings: 0, // Solo comisión
+    tips: 0,     // Solo propinas
   });
+  const [dailyServices, setDailyServices] = useState<DailyService[]>([]);
 
+  // 1. Cargar Datos Básicos del Lavador
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchWasher = async () => {
       if (!id) return;
-      
-      console.log("--- INICIANDO CARGA DE PERFIL ---");
-      console.log("ID Buscado:", id);
+      const docSnap = await getDoc(doc(db, "washers", id as string));
+      if (docSnap.exists()) {
+        setWasher(docSnap.data());
+      }
+    };
+    fetchWasher();
+  }, [id]);
 
+  // 2. Cargar Métricas DEL DÍA SELECCIONADO
+  useEffect(() => {
+    const fetchDailyMetrics = async () => {
+      if (!id) return;
+      setLoading(true);
+        console.log("Cargando métricas para lavador:", id, "en fecha:", selectedDate);
       try {
-        setLoading(true);
+        // Configurar rango de fechas (00:00:00 a 23:59:59)
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        const startOfDay = new Date(year, month - 1, day, 0, 0, 0);
+        const endOfDay = new Date(year, month - 1, day, 23, 59, 59);
 
-        // A. Cargar datos del Lavador
-        const washerRef = doc(db, "washers", id);
-        const washerSnap = await getDoc(washerRef);
-        
-        if (washerSnap.exists()) {
-          const wData = { id: washerSnap.id, ...washerSnap.data() } as WasherData;
-          console.log("Lavador encontrado:", wData.name);
-          setWasher(wData);
-        } else {
-          console.error("Lavador NO existe en la base de datos");
-          alert("Lavador no encontrado (ID inválido)");
-          router.push("/washers");
-          return;
-        }
-
-        // B. Cargar Historial
-        // IMPORTANTE: Esto busca servicios donde el campo 'washerId' sea igual al ID actual
+        // Query: Servicios de ESTE lavador en ESTE día
         const q = query(
           collection(db, "services"),
-          where("washerId", "==", id), 
-          orderBy("createdAt", "desc")
+          where("washerId", "==", id),
+          where("createdAt", ">=", Timestamp.fromDate(startOfDay)),
+          where("createdAt", "<=", Timestamp.fromDate(endOfDay))
         );
-        
+
         const querySnapshot = await getDocs(q);
-        console.log(`Se encontraron ${querySnapshot.size} servicios para este ID.`);
 
-        const services = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                createdAt: data.createdAt,
-                vehicle: data.vehicle || { model: 'Desc.', color: '-' },
-                financials: {
-                    totalPrice: data.financials?.totalPrice || 0,
-                    washerEarnings: data.financials?.washerEarnings || 0,
-                    tipAmount: data.financials?.tipAmount || 0,
-                }
-            } as ServiceData;
+        let tempCount = 0;
+        let tempEarnings = 0;
+        let tempTips = 0;
+        const servicesList: DailyService[] = [];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          // Solo contar servicios no cancelados
+          if (data.status !== 'cancelled') {
+            tempCount++;
+            const fin = data.financials || {};
+            
+            tempEarnings += (fin.washerEarnings || 0);
+            tempTips += (fin.tipAmount || 0);
+
+            servicesList.push({
+              id: doc.id,
+              vehicle: `${data.vehicle.model} (${data.vehicle.color})`,
+              totalPrice: fin.totalPrice,
+              washerEarnings: fin.washerEarnings,
+              tipAmount: fin.tipAmount,
+              paymentMethod: fin.paymentMethod
+            });
+          }
         });
-        
-        setHistory(services);
 
-        // C. Calcular Métricas
-        const newStats = services.reduce((acc, curr) => ({
-            totalEarned: acc.totalEarned + curr.financials.washerEarnings,
-            totalTips: acc.totalTips + curr.financials.tipAmount,
-            totalCars: acc.totalCars + 1
-        }), { totalEarned: 0, totalTips: 0, totalCars: 0 });
-
-        setStats(newStats);
+        setDailyStats({ count: tempCount, earnings: tempEarnings, tips: tempTips });
+        setDailyServices(servicesList);
 
       } catch (error) {
-        console.error("Error cargando perfil:", error);
+        console.error("Error cargando métricas diarias:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [id, router]);
+    fetchDailyMetrics();
+  }, [id, selectedDate]); // Se ejecuta cada vez que cambia el ID o la FECHA
 
-  if (loading) return <div className="p-10 text-center font-bold text-gray-500 animate-pulse">Cargando datos del lavador...</div>;
-  if (!washer) return null;
+  if (!washer) return <div className="p-10 text-center">Cargando perfil...</div>;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
       
-      {/* 1. Encabezado */}
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border">
-        <button 
-            onClick={() => router.back()} 
-            className="p-2 hover:bg-gray-100 rounded-full transition"
-        >
-            <ArrowLeft className="w-6 h-6 text-gray-600" />
-        </button>
-        <div>
-            <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                <User className="w-6 h-6 text-blue-600" />
-                {washer.name}
-            </h1>
-            <p className="text-gray-500 text-sm">{washer.phone || 'Sin teléfono'}</p>
-        </div>
-        <div className="ml-auto">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${washer.active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {washer.active ? 'ACTIVO' : 'INACTIVO'}
-            </span>
-        </div>
-      </div>
-
-      {/* 2. Tarjetas de Resumen Histórico */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-green-500">
-            <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total Ganado (Histórico)</p>
-            <h3 className="text-3xl font-bold text-green-700 flex items-center">
-                <DollarSign className="w-6 h-6" />
-                {stats.totalEarned.toFixed(2)}
-            </h3>
-            <p className="text-xs text-gray-400 mt-1">Suma de todas sus comisiones</p>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-yellow-400">
-            <p className="text-gray-400 text-xs font-bold uppercase mb-1">Total Propinas</p>
-            <h3 className="text-3xl font-bold text-yellow-600 flex items-center">
-                <DollarSign className="w-6 h-6" />
-                {stats.totalTips.toFixed(2)}
-            </h3>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-blue-500">
-            <p className="text-gray-400 text-xs font-bold uppercase mb-1">Autos Lavados</p>
-            <h3 className="text-3xl font-bold text-blue-700 flex items-center gap-2">
-                <Car className="w-6 h-6" />
-                {stats.totalCars}
-            </h3>
-        </div>
-      </div>
-
-      {/* 3. Tabla de Historial */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b font-bold text-gray-700 flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            Historial Completo de Servicios
-        </div>
-        
-        {history.length === 0 ? (
-            <div className="p-8 text-center flex flex-col items-center gap-3">
-                <AlertCircle className="w-10 h-10 text-gray-300" />
-                <p className="text-gray-500 font-medium">Este lavador no tiene servicios registrados con su ID actual.</p>
-                <p className="text-xs text-gray-400 max-w-md">
-                    Nota: Si eliminaste y volviste a crear al lavador, los servicios anteriores se perdieron porque están asociados al ID viejo. Solo aparecerán los nuevos.
+      {/* HEADER: Botón regresar y Datos Personales */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4">
+            <button onClick={() => router.back()} className="p-2 bg-white rounded-full hover:bg-gray-100 border border-gray-200 transition">
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+                <h1 className="text-3xl font-black text-gray-900">{washer.name}</h1>
+                <p className="text-gray-500 text-sm font-medium flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-yellow-500"/>
+                    Perfil de Rendimiento
                 </p>
             </div>
-        ) : (
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="text-xs text-gray-500 uppercase bg-gray-100 border-b">
-                        <tr>
-                            <th className="px-6 py-3">Fecha</th>
-                            <th className="px-6 py-3">Vehículo</th>
-                            <th className="px-6 py-3 text-right">Comisión</th>
-                            <th className="px-6 py-3 text-right">Propina</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {history.map((svc) => (
-                            <tr key={svc.id} className="hover:bg-gray-50 transition">
-                                <td className="px-6 py-4 font-medium text-gray-900">
-                                    {svc.createdAt?.seconds 
-                                        ? new Date(svc.createdAt.seconds * 1000).toLocaleDateString() 
-                                        : '-'}
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="font-bold">{svc.vehicle.model}</div>
-                                    <div className="text-xs text-gray-500">{svc.vehicle.color}</div>
-                                </td>
-                                <td className="px-6 py-4 text-right text-green-600 font-bold">
-                                    ${svc.financials.washerEarnings.toFixed(2)}
-                                </td>
-                                <td className="px-6 py-4 text-right text-yellow-600">
-                                    {svc.financials.tipAmount > 0 ? `$${svc.financials.tipAmount.toFixed(2)}` : '-'}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-100"></div>
+
+      {/* --- SECCIÓN: RENDIMIENTO DIARIO --- */}
+      <div className="bg-gray-50 p-6 rounded-3xl border border-gray-200">
+        
+        {/* CONTROL DE CALENDARIO */}
+        <div className="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-4 mb-6">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-espuma-blue"/>
+                Métricas Diarias
+            </h2>
+            
+            <div className="bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
+                <div className="bg-espuma-blue/10 p-2 rounded-lg">
+                    <Calendar className="w-5 h-5 text-espuma-blue"/>
+                </div>
+                <div className="flex flex-col px-2">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Seleccionar Día</span>
+                    <input 
+                        type="date" 
+                        value={selectedDate} 
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="text-sm font-bold text-gray-800 outline-none bg-transparent cursor-pointer"
+                    />
+                </div>
             </div>
-        )}
+        </div>
+
+        {/* TARJETAS DE MÉTRICAS */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            
+            {/* 1. AUTOS LAVADOS */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase">Vehículos</p>
+                    <p className="text-3xl font-black text-gray-800 mt-1">{dailyStats.count}</p>
+                </div>
+                <div className="p-3 bg-blue-50 rounded-xl">
+                    <Car className="w-6 h-6 text-espuma-blue"/>
+                </div>
+            </div>
+
+            {/* 2. GANANCIA (COMISIÓN) */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase">Comisión (Sueldo)</p>
+                    <p className="text-3xl font-black text-gray-800 mt-1">${dailyStats.earnings.toFixed(2)}</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-xl">
+                    <DollarSign className="w-6 h-6 text-green-600"/>
+                </div>
+            </div>
+
+            {/* 3. PROPINAS */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-yellow-100 flex items-center justify-between relative overflow-hidden">
+                <div className="relative z-10">
+                    <p className="text-xs font-bold text-yellow-600 uppercase">Propinas</p>
+                    <p className="text-3xl font-black text-yellow-700 mt-1">${dailyStats.tips.toFixed(2)}</p>
+                </div>
+                <div className="p-3 bg-yellow-100 rounded-xl relative z-10">
+                    <Banknote className="w-6 h-6 text-yellow-600"/>
+                </div>
+                {/* Decoración de fondo */}
+                <div className="absolute right-0 top-0 h-full w-16 bg-gradient-to-l from-yellow-50 to-transparent"></div>
+            </div>
+
+        </div>
+
+        {/* LISTA DE SERVICIOS DEL DÍA */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="p-4 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Historial del Día</h3>
+                <span className="text-xs font-medium text-gray-400">{dailyServices.length} servicios completados</span>
+            </div>
+            
+            {loading ? (
+                <div className="p-8 text-center text-gray-400 text-sm">Cargando datos del día...</div>
+            ) : dailyServices.length === 0 ? (
+                <div className="p-8 text-center text-gray-400 text-sm flex flex-col items-center">
+                    <Car className="w-10 h-10 mb-2 opacity-20"/>
+                    No hay lavados registrados en esta fecha.
+                </div>
+            ) : (
+                <div className="divide-y divide-gray-100">
+                    {dailyServices.map((service) => (
+                        <div key={service.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center font-bold text-espuma-blue text-xs">
+                                    <Car className="w-5 h-5"/>
+                                </div>
+                                <div>
+                                    <p className="font-bold text-gray-800 text-sm">{service.vehicle}</p>
+                                    <p className="text-xs text-gray-400 capitalize">{service.paymentMethod}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-green-600 text-sm">+${service.washerEarnings.toFixed(2)}</p>
+                                {service.tipAmount > 0 && (
+                                    <p className="text-xs text-yellow-600 font-medium flex items-center justify-end gap-1">
+                                        <Banknote className="w-3 h-3"/> ${service.tipAmount.toFixed(2)}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+        
+        <div className="mt-4 flex justify-end">
+            <div className="text-right">
+                <p className="text-xs text-gray-400 uppercase font-bold">Total a Pagar por este día</p>
+                <p className="text-2xl font-black text-gray-900 border-b-4 border-espuma-blue inline-block">
+                    ${(dailyStats.earnings + dailyStats.tips).toFixed(2)}
+                </p>
+            </div>
+        </div>
+
       </div>
     </div>
   );
