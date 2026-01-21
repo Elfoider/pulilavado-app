@@ -1,445 +1,442 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { ServiceDocument } from '@/types';
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { 
-    FileSpreadsheet, 
-    FileText, 
-    Search, 
-    DollarSign, 
-    CalendarDays, 
-    TrendingUp, 
-    Wallet,       // Efectivo
-    Smartphone,   // Yappy
-    CreditCard,   // Tarjeta
-    Landmark      // ACH/Banco
+  TrendingUp, Wallet, Car, Building2, 
+  DollarSign, CreditCard, Banknote, FileText, Calendar as CalendarIcon, Download
 } from 'lucide-react';
 
-interface WasherSummary {
-  name: string;
+// --- IMPORTAR LIBRERÍAS DE PDF ---
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+// Interfaces
+interface PayrollItem {
+  washerName: string;
   count: number;
-  commission: number; // Nómina a pagar
-  tips: number;       // Solo control (Tarjeta amarilla)
+  totalPay: number; // Solo comisión
 }
 
-export default function ReportsPanel() {
+export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   
-  const [consolidatedData, setConsolidatedData] = useState<WasherSummary[]>([]);
-  
-  const [globalStats, setGlobalStats] = useState({
-    totalServices: 0,
-    totalPayroll: 0,   // A Pagar Lavadores
-    totalBusiness: 0,  // Ganancia Negocio
-    totalTips: 0,      // Total Propinas
-    dailyAverage: 0,   // Promedio autos/día
-    
-    // DESGLOSE DE COBROS
-    incomeCash: 0,     // Efectivo
-    incomeYappy: 0,    // Yappy
-    incomeCard: 0,     // Tarjeta
-    incomeACH: 0       // Transferencia
-  });
+  // CONTROL DE FECHAS
+  const [filterType, setFilterType] = useState<'today' | 'week' | 'custom'>('today');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
-  // --- FUNCIÓN PRINCIPAL DE CÁLCULO ---
-  const fetchReportData = async (startInput: string, endInput: string) => {
-    if (!startInput || !endInput) {
-      alert("Selecciona un rango de fechas.");
-      return;
-    }
+  // ESTADOS FINANCIEROS
+  const [totalRevenue, setTotalRevenue] = useState(0);       
+  const [serviceSales, setServiceSales] = useState(0);       
+  const [netBusinessProfit, setNetBusinessProfit] = useState(0); 
+  const [totalTips, setTotalTips] = useState(0);             
+  
+  // Desgloses
+  const [incomeByMethod, setIncomeByMethod] = useState({ Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 });
+  const [tipsByMethod, setTipsByMethod] = useState({ Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 });
+  
+  // CAJA REAL
+  const [netCashInRegister, setNetCashInRegister] = useState(0); 
+  const [digitalTipsPaidCash, setDigitalTipsPaidCash] = useState(0); // Dato útil para el reporte
+
+  // NÓMINA
+  const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
+  const [totalPayrollToPay, setTotalPayrollToPay] = useState(0);
+
+  // --- FUNCIÓN DE CÁLCULO (IGUAL QUE ANTES) ---
+  const fetchReport = async () => {
     setLoading(true);
-
     try {
-      const start = new Date(startInput + 'T00:00:00');
-      const end = new Date(endInput + 'T23:59:59');
+      let startDate = new Date();
+      let endDate = new Date();
 
-      // Días de diferencia
-      const diffTime = Math.abs(end.getTime() - start.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      if (filterType === 'today') {
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+      } else if (filterType === 'week') {
+        const day = startDate.getDay();
+        const diff = startDate.getDate() - day + (day === 0 ? -6 : 1); 
+        startDate.setDate(diff);
+        startDate.setHours(0,0,0,0);
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+      } else if (filterType === 'custom') {
+        const [year, month, day] = selectedDate.split('-').map(Number);
+        startDate = new Date(year, month - 1, day, 0, 0, 0);
+        endDate = new Date(year, month - 1, day, 23, 59, 59);
+      }
 
       const q = query(
         collection(db, "services"),
-        where("createdAt", ">=", Timestamp.fromDate(start)),
-        where("createdAt", "<=", Timestamp.fromDate(end)),
-        orderBy("createdAt", "desc")
+        where("createdAt", ">=", Timestamp.fromDate(startDate)),
+        where("createdAt", "<=", Timestamp.fromDate(endDate))
       );
 
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(d => d.data() as ServiceDocument);
-
-      // --- VARIABLES TEMPORALES ---
-      const summaryMap: Record<string, WasherSummary> = {};
-      let gPayroll = 0;
-      let gBusiness = 0;
-      let gTips = 0;
-
-      // Desglose de Pagos
-      let payCash = 0;
-      let payYappy = 0;
-      let payCard = 0;
-      let payACH = 0;
-
-      data.forEach(svc => {
-        // 1. Datos Financieros Generales
-        const name = (svc.washerName || 'Desconocido').trim();
-        const comm = svc.financials.washerEarnings || 0;
-        const biz = svc.financials.businessEarnings || 0;
-        const tip = svc.financials.tipAmount || 0;
-        const total = svc.financials.totalPrice || 0;
-
-        gPayroll += comm;
-        gBusiness += biz;
-        gTips += tip;
-
-        // 2. Clasificación por Método de Pago
-        // Si no tiene método (datos viejos), asumimos Efectivo
-        const method = svc.paymentMethod || 'Efectivo';
-        
-        if (method === 'Efectivo') payCash += total;
-        else if (method === 'Yappy') payYappy += total;
-        else if (method === 'Tarjeta') payCard += total;
-        else if (method === 'Transferencia') payACH += total;
-        
-        // 3. Agrupación por Lavador
-        if (!summaryMap[name]) {
-          summaryMap[name] = { name, count: 0, commission: 0, tips: 0 };
-        }
-        summaryMap[name].count += 1;
-        summaryMap[name].commission += comm;
-        summaryMap[name].tips += tip;
-      });
-
-      const summaryArray = Object.values(summaryMap).sort((a, b) => b.commission - a.commission);
       
-      setConsolidatedData(summaryArray);
-      setGlobalStats({
-        totalServices: data.length,
-        totalPayroll: gPayroll,
-        totalBusiness: gBusiness,
-        totalTips: gTips,
-        dailyAverage: data.length > 0 ? (data.length / (diffDays || 1)) : 0,
-        
-        // Asignar desglose
-        incomeCash: payCash,
-        incomeYappy: payYappy,
-        incomeCard: payCard,
-        incomeACH: payACH
+      let tempServiceSales = 0; 
+      let tempTips = 0;  
+      let tempBusiness = 0;
+      
+      const tempIncomeMethod = { Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 };
+      const tempTipsMethod = { Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 };
+      const washerMap: Record<string, PayrollItem> = {};
+
+      let cashOutflowForTips = 0; 
+
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.status !== 'cancelled') { 
+            const fin = data.financials || {};
+            const servicePrice = fin.totalPrice || 0;
+            const tip = fin.tipAmount || 0;
+            const washerId = data.washerId;
+            const washerName = data.washerName || 'Desconocido';
+            const washerEarn = fin.washerEarnings || 0;
+
+            // Ventas
+            tempServiceSales += servicePrice;
+            tempBusiness += (fin.businessEarnings || 0);
+
+            const payMethod = (fin.paymentMethod || 'Efectivo') as keyof typeof tempIncomeMethod;
+            if (tempIncomeMethod[payMethod] !== undefined) {
+                tempIncomeMethod[payMethod] += servicePrice;
+            } else {
+                tempIncomeMethod['Efectivo'] += servicePrice;
+            }
+
+            // Propinas
+            if (tip > 0) {
+                tempTips += tip;
+                let tipMethod = fin.tipMethod; 
+                if (!tipMethod) tipMethod = 'Yappy'; // Por defecto Yappy si es null
+
+                const safeTipMethod = tipMethod as keyof typeof tempTipsMethod;
+
+                if (tempTipsMethod[safeTipMethod] !== undefined) {
+                    tempTipsMethod[safeTipMethod] += tip;
+                } else {
+                    tempTipsMethod['Yappy'] += tip;
+                }
+
+                // Si NO es efectivo, significa que entró digital y SALE efectivo de caja
+                if (safeTipMethod !== 'Efectivo') {
+                    cashOutflowForTips += tip;
+                }
+            }
+
+            // Nómina
+            if (!washerMap[washerId]) {
+                washerMap[washerId] = { washerName, count: 0, totalPay: 0 };
+            }
+            washerMap[washerId].count += 1;
+            washerMap[washerId].totalPay += washerEarn; 
+        }
       });
+
+      setServiceSales(tempServiceSales);
+      setTotalTips(tempTips);
+      setTotalRevenue(tempServiceSales + tempTips);
+      setNetBusinessProfit(tempBusiness);
+      setIncomeByMethod(tempIncomeMethod);
+      setTipsByMethod(tempTipsMethod);
+      
+      setDigitalTipsPaidCash(cashOutflowForTips);
+      setNetCashInRegister(tempIncomeMethod['Efectivo'] - cashOutflowForTips);
+
+      const payrollArray = Object.values(washerMap);
+      setPayrollList(payrollArray);
+      setTotalPayrollToPay(payrollArray.reduce((acc, curr) => acc + curr.totalPay, 0));
 
     } catch (error) {
-      console.error("Error:", error);
-      alert("Error al generar reporte.");
+      console.error("Error fetching report:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleManualGenerate = () => fetchReportData(startDate, endDate);
+  useEffect(() => {
+    fetchReport();
+  }, [filterType, selectedDate]);
 
-  const handleLast7Days = () => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(end.getDate() - 6); 
-    const sStr = start.toISOString().split('T')[0];
-    const eStr = end.toISOString().split('T')[0];
-    setStartDate(sStr);
-    setEndDate(eStr);
-    fetchReportData(sStr, eStr);
-  };
 
-  // --- EXPORTAR EXCEL (Actualizado con desglose) ---
-  const downloadExcel = () => {
-    if (consolidatedData.length === 0) return;
-    const workbook = XLSX.utils.book_new();
-
-    // Hoja 1: Resumen de Negocio
-    const statsRows = [
-      { Concepto: "--- MÉTRICAS GENERALES ---", Valor: "" },
-      { Concepto: "Ganancia Neta (Negocio)", Valor: globalStats.totalBusiness },
-      { Concepto: "Nómina a Pagar", Valor: globalStats.totalPayroll },
-      { Concepto: "Total Autos", Valor: globalStats.totalServices },
-      { Concepto: "", Valor: "" },
-      { Concepto: "--- DESGLOSE DE COBROS (Entradas) ---", Valor: "" },
-      { Concepto: "Efectivo (Caja)", Valor: globalStats.incomeCash },
-      { Concepto: "Yappy", Valor: globalStats.incomeYappy },
-      { Concepto: "Tarjeta (POS)", Valor: globalStats.incomeCard },
-      { Concepto: "Transferencia (ACH)", Valor: globalStats.incomeACH },
-      { Concepto: "TOTAL INGRESOS BRUTOS", Valor: (globalStats.incomeCash + globalStats.incomeYappy + globalStats.incomeCard + globalStats.incomeACH) },
-    ];
-    const statsSheet = XLSX.utils.json_to_sheet(statsRows);
-    // Ajustar ancho columnas
-    statsSheet['!cols'] = [{wch:35}, {wch:15}];
-    XLSX.utils.book_append_sheet(workbook, statsSheet, "Resumen Financiero");
-
-    // Hoja 2: Nómina
-    const rows = consolidatedData.map(w => ({
-        Lavador: w.name,
-        Autos_Lavados: w.count,
-        A_PAGAR: w.commission,
-        FIRMA_RECIBIDO: ''
-    }));
-    rows.push({
-        Lavador: 'TOTALES',
-        Autos_Lavados: rows.reduce((a, b) => a + b.Autos_Lavados, 0),
-        A_PAGAR: rows.reduce((a, b) => a + b.A_PAGAR, 0),
-        FIRMA_RECIBIDO: ''
-    });
-
-    const sheet = XLSX.utils.json_to_sheet(rows);
-    sheet['!cols'] = [{wch:25}, {wch:12}, {wch:15}, {wch:30}];
-    XLSX.utils.book_append_sheet(workbook, sheet, "Nómina");
-
-    XLSX.writeFile(workbook, `Cierre_Caja_${startDate}.xlsx`);
-  };
-
-  // --- EXPORTAR PDF (Actualizado con desglose) ---
-  const downloadPDF = () => {
-    if (consolidatedData.length === 0) return;
+  // ==========================================
+  // 1. GENERAR PDF NÓMINA (PARA FIRMAR)
+  // ==========================================
+  const generatePayrollPDF = () => {
     const doc = new jsPDF();
-    
+    const todayStr = new Date().toLocaleDateString();
+
+    // Encabezado
     doc.setFontSize(18);
-    doc.text("Reporte de Cierre & Nómina", 14, 20);
+    doc.text("MR. ESPUMA - REPORTE DE NÓMINA", 14, 20);
     doc.setFontSize(10);
-    doc.text(`Periodo: ${startDate} al ${endDate}`, 14, 28);
+    doc.text(`Fecha de Corte: ${filterType === 'custom' ? selectedDate : todayStr}`, 14, 28);
+    doc.text("Concepto: Pago de Comisiones (Propinas pagadas diariamente)", 14, 34);
 
-    // // --- CAJA DE RESUMEN (Más grande para que quepa todo) ---
-    // doc.setFillColor(245, 247, 250);
-    // doc.rect(14, 35, 180, 50, 'F'); // Caja más alta
-    
-    // doc.setFontSize(10);
-    // doc.setFont("helvetica", "bold");
-    // doc.text("RESUMEN FINANCIERO:", 18, 42);
-    
-    // // Columna Izquierda (Métodos de Pago)
-    // doc.setFont("helvetica", "normal");
-    // doc.text(`Efectivo: $${globalStats.incomeCash.toFixed(2)}`, 18, 50);
-    // doc.text(`Yappy: $${globalStats.incomeYappy.toFixed(2)}`, 18, 56);
-    // doc.text(`Tarjeta: $${globalStats.incomeCard.toFixed(2)}`, 18, 62);
-    // doc.text(`ACH: $${globalStats.incomeACH.toFixed(2)}`, 18, 68);
-    
-    // // Columna Derecha (Totales)
-    // doc.setFont("helvetica", "bold");
-    // doc.text(`Ganancia Negocio: $${globalStats.totalBusiness.toFixed(2)}`, 100, 50);
-    // doc.text(`Nómina a Pagar: $${globalStats.totalPayroll.toFixed(2)}`, 100, 56);
-    // doc.text(`Total Ingresos: $${(globalStats.totalBusiness + globalStats.totalPayroll).toFixed(2)}`, 100, 68);
-
-    // Tabla de Nómina
-    const tableRows = consolidatedData.map(w => [
-        w.name,
-        w.count,
-        `$${w.commission.toFixed(2)}`,
-        '' 
+    // Tabla
+    const tableData = payrollList.map(item => [
+      item.washerName,
+      item.count,
+      `$${item.totalPay.toFixed(2)}`,
+      "___________________" // Espacio para firmar
     ]);
 
     autoTable(doc, {
-      startY: 50, // Empezar más abajo porque la caja de resumen creció
-      head: [['Lavador', 'Autos', 'A PAGAR', 'FIRMA / RECIBIDO']],
-      body: tableRows,
+      startY: 40,
+      head: [['Lavador', 'Autos Lavados', 'A Pagar', 'Firma de Recibido']],
+      body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: [30, 41, 59], halign: 'center' },
-      columnStyles: {
-        0: { cellWidth: 50 },
-        1: { cellWidth: 20, halign: 'center' },
-        2: { cellWidth: 35, halign: 'right', fontStyle: 'bold', fillColor: [240, 253, 244] },
-        3: { cellWidth: 'auto' }
-      },
-      styles: { minCellHeight: 18, valign: 'middle' },
-      foot: [[ 'TOTALES', globalStats.totalServices, `$${globalStats.totalPayroll.toFixed(2)}`, '' ]],
-      footStyles: { fillColor: [220, 220, 220], textColor: [0,0,0], fontStyle: 'bold' }
+      headStyles: { fillColor: [41, 128, 185] }, // Color Azul
     });
 
-    doc.save(`Reporte_Cierre_${startDate}.pdf`);
+    // Totales
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL NÓMINA A DISPERSAR: $${totalPayrollToPay.toFixed(2)}`, 14, finalY);
+
+    doc.save(`Nomina_MrEspuma_${todayStr}.pdf`);
+  };
+
+
+  // ==========================================
+  // 2. GENERAR PDF FINANCIERO (GERENCIAL)
+  // ==========================================
+  const generateFinancialPDF = () => {
+    const doc = new jsPDF();
+    const todayStr = new Date().toLocaleDateString();
+
+    // Título
+    doc.setFontSize(22);
+    doc.setTextColor(44, 62, 80);
+    doc.text("REPORTE FINANCIERO INTERNO", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 28);
+    doc.text(`Filtro: ${filterType.toUpperCase()} ${filterType === 'custom' ? selectedDate : ''}`, 14, 33);
+
+    // --- SECCIÓN 1: CAJA REAL ---
+    doc.setDrawColor(0);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(14, 40, 180, 25, 'F');
+    
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text("CAJA NETA (Dinero Físico Real)", 20, 50);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text(`$${netCashInRegister.toFixed(2)}`, 20, 58);
+
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text("(Ventas Efectivo - Propinas Digitales Pagadas)", 100, 58);
+
+    // --- SECCIÓN 2: ESTADÍSTICAS ---
+    let yPos = 75;
+    
+    const kpiData = [
+      ['Venta Servicios (Bruto)', `$${serviceSales.toFixed(2)}`],
+      ['Propinas Totales', `$${totalTips.toFixed(2)}`],
+      ['Salida Efectivo (Props. Digitales)', `-$${digitalTipsPaidCash.toFixed(2)}`],
+      ['GANANCIA NEGOCIO (Estimada)', `$${netBusinessProfit.toFixed(2)}`]
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Concepto', 'Monto']],
+      body: kpiData,
+      theme: 'striped',
+      headStyles: { fillColor: [52, 73, 94] }
+    });
+
+    // --- SECCIÓN 3: DESGLOSE SERVICIOS ---
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.setFontSize(12);
+    doc.text("Desglose Ingresos (Ventas)", 14, yPos);
+
+    autoTable(doc, {
+      startY: yPos + 5,
+      head: [['Método', 'Monto']],
+      body: [
+        ['Efectivo', `$${incomeByMethod.Efectivo.toFixed(2)}`],
+        ['Yappy', `$${incomeByMethod.Yappy.toFixed(2)}`],
+        ['Tarjeta', `$${incomeByMethod.Tarjeta.toFixed(2)}`],
+        ['ACH/Otro', `$${incomeByMethod.Transferencia.toFixed(2)}`],
+      ],
+      theme: 'grid',
+    });
+
+    // --- SECCIÓN 4: DESGLOSE PROPINAS ---
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+    doc.text("Desglose Propinas (Origen)", 14, yPos);
+
+    autoTable(doc, {
+      startY: yPos + 5,
+      head: [['Método', 'Monto', 'Efecto en Caja']],
+      body: [
+        ['Efectivo', `$${tipsByMethod.Efectivo.toFixed(2)}`, 'Neutro'],
+        ['Yappy / Sin Esp.', `$${tipsByMethod.Yappy.toFixed(2)}`, 'Resta Caja'],
+        ['Tarjeta', `$${tipsByMethod.Tarjeta.toFixed(2)}`, 'Resta Caja'],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [243, 156, 18] } // Naranja/Amarillo
+    });
+
+    doc.save(`Financiero_Detallado_${todayStr}.pdf`);
   };
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow border space-y-6">
-      <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-        <DollarSign className="w-6 h-6 text-blue-600" />
-        Reportes Gerenciales y Nómina
-      </h2>
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       
-      {/* Controles */}
-      <div className="flex flex-col xl:flex-row gap-4 items-end bg-gray-50 p-4 rounded-lg border">
-        <button 
-            onClick={handleLast7Days}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-indigo-700 flex items-center gap-2 shadow-sm w-full xl:w-auto justify-center whitespace-nowrap"
-        >
-            <CalendarDays className="w-4 h-4" />
-            Últimos 7 Días
-        </button>
-
-        <div className="h-8 w-px bg-gray-300 hidden xl:block mx-2"></div>
-
-        <div className="flex gap-2 w-full">
-            <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Desde</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="border p-2 rounded w-full"/>
-            </div>
-            <div className="flex-1">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Hasta</label>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="border p-2 rounded w-full"/>
-            </div>
+      {/* HEADER Y FILTROS */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+        <div>
+          <h2 className="text-2xl font-black text-gray-800">Panel Financiero</h2>
+          <p className="text-gray-500 text-sm mt-1">Control de caja, nómina y dispersión de ingresos.</p>
         </div>
         
-        <button 
-            onClick={handleManualGenerate} 
-            disabled={loading} 
-            className="bg-gray-900 text-white px-6 py-2 rounded-lg font-bold hover:bg-gray-800 w-full xl:w-auto flex items-center justify-center gap-2 whitespace-nowrap"
-        >
-            <Search className="w-4 h-4" />
-            {loading ? '...' : 'Calcular Rango'}
-        </button>
+        <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-2 rounded-xl border border-gray-200">
+            <button onClick={() => setFilterType('today')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${filterType === 'today' ? 'bg-white text-espuma-blue shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Hoy</button>
+            <button onClick={() => setFilterType('week')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${filterType === 'week' ? 'bg-white text-espuma-blue shadow-md' : 'text-gray-500 hover:text-gray-700'}`}>Esta Semana</button>
+            
+            <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+            <div className="flex items-center gap-2 relative">
+                <CalendarIcon className="w-4 h-4 text-gray-400 absolute left-3"/>
+                <input type="date" value={selectedDate} onChange={(e) => { setSelectedDate(e.target.value); setFilterType('custom'); }} className={`pl-9 pr-3 py-1.5 rounded-lg text-sm font-bold border outline-none focus:ring-2 focus:ring-espuma-blue ${filterType === 'custom' ? 'bg-white border-espuma-blue text-espuma-blue shadow-md' : 'bg-transparent border-transparent text-gray-600'}`} />
+            </div>
+
+            <button onClick={fetchReport} className="ml-2 bg-espuma-blue hover:bg-cyan-700 text-white p-2 rounded-lg transition shadow-md shadow-cyan-500/20">
+                <TrendingUp className="w-5 h-5"/>
+            </button>
+        </div>
       </div>
 
-      {consolidatedData.length > 0 && (
-        <div className="animate-in fade-in space-y-8">
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 border border-gray-700 relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-10"><Banknote className="w-24 h-24"/></div>
+             <div className="relative z-10">
+                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Efectivo Real en Caja</p>
+                <h3 className="text-4xl font-black tracking-tight">${netCashInRegister.toFixed(2)}</h3>
+                <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
+                    <TrendingUp className="w-3 h-3 rotate-180"/> 
+                    <span>Desc. propinas digitales</span>
+                </div>
+             </div>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">
+             <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">Venta Servicios</p>
+             <h3 className="text-3xl font-black text-gray-800">${serviceSales.toFixed(2)}</h3>
+             <p className="text-gray-400 text-xs mt-1">Total facturado en lavados</p>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-gradient-to-br from-espuma-blue to-cyan-600 text-white shadow-lg">
+             <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-2">Ganancia Negocio</p>
+             <h3 className="text-3xl font-black">${netBusinessProfit.toFixed(2)}</h3>
+             <p className="text-blue-100 text-xs mt-1">Después de comisiones</p>
+          </div>
+
+          <div className="p-6 rounded-2xl bg-orange-50 border border-orange-100">
+             <p className="text-orange-600 text-xs font-bold uppercase tracking-wider mb-2">Nómina a Pagar</p>
+             <h3 className="text-3xl font-black text-orange-700">${totalPayrollToPay.toFixed(2)}</h3>
+             <p className="text-orange-600/70 text-xs mt-1">Solo comisiones</p>
+          </div>
+      </div>
+
+      {/* DESGLOSES */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2 mb-6 text-lg">
+                <Car className="w-5 h-5 text-espuma-blue"/>
+                Ingresos por Servicios (Ventas)
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+                <MethodCard title="Efectivo" amount={incomeByMethod.Efectivo} color="green" />
+                <MethodCard title="Yappy" amount={incomeByMethod.Yappy} color="blue" />
+                <MethodCard title="Tarjeta" amount={incomeByMethod.Tarjeta} color="purple" />
+                <MethodCard title="ACH / Otros" amount={incomeByMethod.Transferencia} color="gray" />
+            </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl border border-yellow-100 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+                    <DollarSign className="w-5 h-5 text-yellow-500"/>
+                    Distribución de Propinas
+                </h3>
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">Total: ${totalTips.toFixed(2)}</span>
+            </div>
             
-            {/* --- SECCIÓN 1: KPI PRINCIPALES --- */}
-            <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Resumen General</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    
-                    {/* Ganancia Negocio */}
-                    <div className="bg-blue-600 text-white p-5 rounded-xl shadow-lg flex flex-col justify-between">
-                        <div className="flex justify-between items-start">
-                            <p className="text-blue-100 text-xs font-bold uppercase tracking-wider">Ganancia Negocio</p>
-                            <TrendingUp className="w-5 h-5 text-blue-300" />
-                        </div>
-                        <p className="text-3xl font-extrabold mt-1">${globalStats.totalBusiness.toFixed(2)}</p>
+            <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                    <div>
+                        <p className="text-xs font-bold text-blue-700 uppercase">Yappy / Sin Espec.</p>
+                        <p className="text-[10px] text-blue-500">Se resta del efectivo de caja</p>
                     </div>
-
-                    {/* Nómina */}
-                    <div className="bg-green-600 text-white p-5 rounded-xl shadow-lg flex flex-col justify-between">
-                        <p className="text-green-100 text-xs font-bold uppercase tracking-wider">Total Nómina</p>
-                        <p className="text-3xl font-extrabold mt-1">${globalStats.totalPayroll.toFixed(2)}</p>
-                    </div>
-                    
-                    {/* Promedio */}
-                    <div className="bg-white border border-gray-200 p-5 rounded-xl shadow-sm">
-                        <p className="text-gray-500 text-xs font-bold uppercase tracking-wider">Promedio Diario</p>
-                        <p className="text-3xl font-bold text-gray-800 mt-1">{globalStats.dailyAverage.toFixed(1)}</p>
-                        <p className="text-xs text-gray-400">Autos</p>
-                    </div>
-
-                    {/* Propinas Control */}
-                    <div className="bg-yellow-50 border border-yellow-200 p-5 rounded-xl shadow-sm">
-                        <p className="text-yellow-800 text-xs font-bold uppercase tracking-wider">Propinas (Ref)</p>
-                        <p className="text-3xl font-bold text-yellow-700 mt-1">${globalStats.totalTips.toFixed(2)}</p>
-                    </div>
+                    <p className="text-lg font-black text-blue-800">${tipsByMethod.Yappy.toFixed(2)}</p>
                 </div>
-            </div>
-
-            {/* --- SECCIÓN 2: DESGLOSE DE COBROS (NUEVO) --- */}
-            <div>
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Desglose por Método de Pago</h3>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    
-                    {/* 1. Efectivo */}
-                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex items-center gap-4">
-                        <div className="p-3 bg-emerald-100 rounded-full text-emerald-600">
-                            <Wallet className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-xs text-emerald-600 font-bold uppercase">Efectivo</p>
-                            <p className="text-xl font-bold text-gray-800">${globalStats.incomeCash.toFixed(2)}</p>
-                        </div>
+                <div className="flex justify-between items-center p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                    <div>
+                        <p className="text-xs font-bold text-purple-700 uppercase">Tarjeta</p>
+                        <p className="text-[10px] text-purple-500">Se resta del efectivo de caja</p>
                     </div>
-
-                    {/* 2. Yappy */}
-                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center gap-4">
-                        <div className="p-3 bg-blue-100 rounded-full text-blue-600">
-                            <Smartphone className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-xs text-blue-600 font-bold uppercase">Yappy</p>
-                            <p className="text-xl font-bold text-gray-800">${globalStats.incomeYappy.toFixed(2)}</p>
-                        </div>
-                    </div>
-
-                    {/* 3. Tarjeta */}
-                    <div className="bg-purple-50 border border-purple-100 p-4 rounded-xl flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 rounded-full text-purple-600">
-                            <CreditCard className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-xs text-purple-600 font-bold uppercase">Tarjeta</p>
-                            <p className="text-xl font-bold text-gray-800">${globalStats.incomeCard.toFixed(2)}</p>
-                        </div>
-                    </div>
-
-                     {/* 4. Transferencia */}
-                     <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl flex items-center gap-4">
-                        <div className="p-3 bg-gray-200 rounded-full text-gray-600">
-                            <Landmark className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <p className="text-xs text-gray-500 font-bold uppercase">ACH</p>
-                            <p className="text-xl font-bold text-gray-800">${globalStats.incomeACH.toFixed(2)}</p>
-                        </div>
-                    </div>
-
+                    <p className="text-lg font-black text-purple-800">${tipsByMethod.Tarjeta.toFixed(2)}</p>
                 </div>
-            </div>
-
-            {/* Botones Descarga */}
-            <div className="flex flex-col sm:flex-row gap-3 border-t pt-4">
-                <button onClick={downloadExcel} className="flex-1 bg-green-700 hover:bg-green-800 text-white py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2">
-                    <FileSpreadsheet className="w-5 h-5" />
-                    Descargar Cierre (Excel)
-                </button>
-                <button onClick={downloadPDF} className="flex-1 bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Descargar Nómina (PDF)
-                </button>
-            </div>
-
-            {/* Tabla Vista Previa */}
-            <div className="border rounded-xl overflow-hidden shadow-sm">
-                <div className="bg-gray-100 px-4 py-2 text-sm font-bold text-gray-600 uppercase flex justify-between">
-                    <span>Detalle de Nómina</span>
-                    <span className="text-xs bg-gray-200 px-2 py-0.5 rounded text-gray-500">
-                        Total Autos: {globalStats.totalServices}
-                    </span>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-white border-b text-gray-500 uppercase text-xs">
-                            <tr>
-                                <th className="px-4 py-3">Lavador</th>
-                                <th className="px-4 py-3 text-center">Autos</th>
-                                <th className="px-4 py-3 text-right bg-green-50 text-green-800">A PAGAR</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {consolidatedData.map((w, idx) => (
-                                <tr key={idx} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 font-bold text-gray-800">{w.name}</td>
-                                    <td className="px-4 py-3 text-center text-gray-500">{w.count}</td>
-                                    <td className="px-4 py-3 text-right font-bold text-green-700 bg-green-50 text-base">
-                                        ${w.commission.toFixed(2)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50 font-bold text-gray-700">
-                             <tr>
-                                <td className="px-4 py-3">TOTALES</td>
-                                <td className="px-4 py-3 text-center">{globalStats.totalServices}</td>
-                                <td className="px-4 py-3 text-right text-green-700">${globalStats.totalPayroll.toFixed(2)}</td>
-                             </tr>
-                        </tfoot>
-                    </table>
+                <div className="flex justify-between items-center p-3 bg-green-50 border border-green-100 rounded-xl opacity-70">
+                     <div>
+                        <p className="text-xs font-bold text-green-700 uppercase">Efectivo</p>
+                        <p className="text-[10px] text-green-600">Directo al lavador</p>
+                    </div>
+                    <p className="text-lg font-black text-green-800">${tipsByMethod.Efectivo.toFixed(2)}</p>
                 </div>
             </div>
         </div>
-      )}
+      </div>
+
+      {/* BOTONES PDF */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <button 
+                onClick={generatePayrollPDF}
+                className="group relative overflow-hidden bg-white border-2 border-orange-500 text-orange-600 py-4 rounded-xl font-bold hover:bg-orange-50 transition flex flex-col items-center justify-center gap-1 shadow-sm hover:shadow-md"
+            >
+                <div className="flex items-center gap-2">
+                    <FileText className="w-6 h-6"/>
+                    <span className="text-lg">Reporte de Pago de Nómina (PDF)</span>
+                </div>
+                <span className="text-xs font-normal opacity-80">Lista para firmar (Sin propinas)</span>
+            </button>
+
+            <button 
+                onClick={generateFinancialPDF}
+                className="group relative overflow-hidden bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-black transition flex flex-col items-center justify-center gap-1 shadow-lg shadow-gray-400/20"
+            >
+                <div className="flex items-center gap-2">
+                    <Building2 className="w-6 h-6 text-emerald-400"/>
+                    <span className="text-lg">Control Financiero Interno (PDF)</span>
+                </div>
+                <span className="text-xs font-normal text-gray-400">Estadísticas completas y cuadre de caja</span>
+            </button>
+      </div>
     </div>
   );
+}
+
+function MethodCard({ title, amount, color }: { title: string, amount: number, color: string }) {
+    const colors: Record<string, string> = {
+        green: "bg-green-50 border-green-100 text-green-800",
+        blue: "bg-blue-50 border-blue-100 text-blue-800",
+        purple: "bg-purple-50 border-purple-100 text-purple-800",
+        gray: "bg-gray-50 border-gray-100 text-gray-800",
+    };
+    return (
+        <div className={`p-4 rounded-xl border ${colors[color]}`}>
+            <p className="text-[10px] font-bold uppercase opacity-70 mb-1">{title}</p>
+            <p className="text-xl font-black">${amount.toFixed(2)}</p>
+        </div>
+    );
 }

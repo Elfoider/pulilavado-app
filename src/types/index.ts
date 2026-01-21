@@ -1,6 +1,6 @@
 // src/types/index.ts
 
-export type PaymentMethod = "efectivo" | "yappy" | "tarjeta" | "Transferencia";
+export type PaymentMethod = "Efectivo" | "Yappy" | "Tarjeta" | "Transferencia";
 
 export interface ServiceFormData {
   washerName: string;
@@ -30,6 +30,8 @@ export interface Washer {
 
 // Así es como se guardará en Firestore
 export interface ServiceDocument {
+  paymentStatus: string;
+  id: string;
   paymentMethod: string;
   washerId: string;
   washerName: string;

@@ -1,21 +1,10 @@
-"use client"
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, PlusCircle, Users, BarChart3, Settings, CarFront, Menu, X, 
-  Heart
-} from 'lucide-react';
-
-const menuItems = [
-  { name: 'Tablero', href: '/', icon: LayoutDashboard },
-  { name: 'Nuevo Servicio', href: '/new', icon: PlusCircle },
-  { name: 'Personal', href: '/washers', icon: Users },
-  { name: 'Clientes', href: '/clients', icon: Heart },
-  { name: 'Reportes', href: '/reports', icon: BarChart3 },
-  { name: 'Config', href: '/settings', icon: Settings },
-];
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CarFront, Menu, X } from "lucide-react";
+import { menuItems } from "@/lib/utils";
 
 export default function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
@@ -28,7 +17,7 @@ export default function MobileNav() {
         <CarFront className="text-blue-500" />
         <span>Mr. Espuma</span>
       </div>
-      
+
       <button onClick={() => setIsOpen(!isOpen)} className="p-1">
         {isOpen ? <X /> : <Menu />}
       </button>
@@ -45,7 +34,7 @@ export default function MobileNav() {
                   href={item.href}
                   onClick={() => setIsOpen(false)} // Cierra el menú al hacer clic
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive ? 'bg-blue-600' : 'hover:bg-gray-800'
+                    isActive ? "bg-blue-600" : "hover:bg-gray-800"
                   }`}
                 >
                   <item.icon className="w-5 h-5" />

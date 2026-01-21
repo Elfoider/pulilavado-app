@@ -3,25 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard,
-  PlusCircle,
-  Users,
-  BarChart3,
-  Settings,
-  Heart,
   Droplets,
-  History
 } from "lucide-react";
-
-const menuItems = [
-  { name: "Tablero Principal", href: "/", icon: LayoutDashboard },
-  { name: 'Historial', href: '/history', icon: History },
-  { name: "Nuevo Servicio", href: "/new", icon: PlusCircle },
-  { name: "Personal / Lavadores", href: "/washers", icon: Users },
-  { name: "Clientes", href: "/clients", icon: Heart },
-  { name: "Reportes y Finanzas", href: "/reports", icon: BarChart3 },
-  { name: "Configuración", href: "/settings", icon: Settings },
-];
+import { menuItems } from "@/lib/utils";
 
 export default function Sidebar() {
   const pathname = usePathname();
