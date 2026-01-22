@@ -6,6 +6,7 @@ import {
   Droplets,
 } from "lucide-react";
 import { menuItems } from "@/lib/utils";
+import { Timestamp } from "firebase/firestore";
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -52,7 +53,7 @@ export default function Sidebar() {
 
       {/* Footer del Sidebar */}
       <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
-        v1.1.0 - Sistema de Gestión
+        <p>v1.1.0 - Sistema de Gestión</p>
       </div>
     </div>
   );

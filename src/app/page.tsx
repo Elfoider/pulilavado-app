@@ -22,6 +22,7 @@ import {
 import NewServiceModal from "@/components/NewServiceModal";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
 import DatabaseFixer from "@/components/DatabaseFilter";
+import { enqueueSnackbar } from "notistack";
 
 export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -292,7 +293,7 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-700 font-medium">
-                      <div className="font-bold">{svc.washerName}</div>
+                      <div className={svc.washerName === "Por Asignar" ? "font-bold text-red-500" : "font-bold"}>{svc.washerName === "Por Asignar" ? <p><AlertCircle className="w-4 h-4 inline mr-1" /> {svc.washerName}</p> : svc.washerName}</div>
                       <div className="inline-flex items-center gap-1 bg-cyan-100 text-cyan-600 px-2 py-0.5 rounded text-[10px] font-bold uppercase mt-1">
                         <ParkingSquare className="w-3 h-3" /> Pista {svc.vehicle?.bay ? `#${svc.vehicle.bay}` : "N/A"}
                       </div>

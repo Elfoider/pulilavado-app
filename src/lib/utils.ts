@@ -13,7 +13,7 @@ import {
 export const menuItems = [
   { name: "Tablero Principal", href: "/", icon: LayoutDashboard },
   { name: 'Historial', href: '/history', icon: History },
-  { name: "Nuevo Servicio", href: "/new", icon: PlusCircle },
+  // { name: "Nuevo Servicio", href: "/new", icon: PlusCircle },
   { name: "Personal / Lavadores", href: "/washers", icon: Users },
   { name: "Clientes", href: "/clients", icon: Heart },
   { name: "Reportes y Finanzas", href: "/reports", icon: BarChart3 },

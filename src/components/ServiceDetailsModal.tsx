@@ -61,7 +61,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         vehicleModel: service.vehicle?.model || "",
         vehicleColor: service.vehicle?.color || "",
         price: service.financials?.totalPrice || 0,
-        paymentMethod: service.paymentMethod || "Efectivo",
+        paymentMethod: service.financials?.paymentMethod || "Efectivo",
         paymentStatus: service.paymentStatus || "paid", // Cargar estado
         washerId: service.washerId || "",
         tipAmount: service.financials?.tipAmount || 0,

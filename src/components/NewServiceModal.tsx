@@ -165,7 +165,8 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
       const washer = washers.find((w) => w.id === selectedWasherId);
 
       // Cálculos Financieros
-      const finalPrice = isPending ? 0 : price;
+      const finalPrice = price;
+      // const finalPrice = isPending ? 0 : price;
       const finalTip = isPending || !hasTip ? 0 : tipAmount;
 
       // USAMOS LA COMISIÓN DINÁMICA
@@ -182,6 +183,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
         vehicle: {
           model: vehicleModel,
           color: vehicleColor || "No especificado",
+          bay: track,
         },
 
         financials: {
