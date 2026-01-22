@@ -31,4 +31,6 @@ export function capitalizarPrimeraLetra(cadena: string): string {
   return cadena.charAt(0).toUpperCase() + cadena.slice(1);
 }
 
+export const versionSoft = "v1.1.1 - Sistema de Gestión";
+
 

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Washer } from "@/types";
 import MoneyInput from "./MoneyInput";
+import { enqueueSnackbar } from "notistack";
 
 interface Props {
   isOpen: boolean;
@@ -221,12 +222,11 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           await addDoc(collection(db, "clients"), clientData);
         }
       }
-
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
-      alert("Error al guardar");
+      enqueueSnackbar("Error al guardar el servicio. Intente nuevamente.", { variant: "error" });
     } finally {
       setLoading(false);
     }

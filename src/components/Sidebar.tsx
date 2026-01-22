@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Droplets,
 } from "lucide-react";
-import { menuItems } from "@/lib/utils";
+import { menuItems, versionSoft } from "@/lib/utils";
 import { Timestamp } from "firebase/firestore";
 
 export default function Sidebar() {
@@ -53,7 +53,7 @@ export default function Sidebar() {
 
       {/* Footer del Sidebar */}
       <div className="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
-        <p>v1.1.0 - Sistema de Gestión</p>
+        <p>{versionSoft}</p>
       </div>
     </div>
   );

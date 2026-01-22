@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { ServiceDocument, Washer } from "@/types";
 import MoneyInput from "./MoneyInput";
+import { enqueueSnackbar } from "notistack";
 
 interface Props {
   service: ServiceDocument;
@@ -109,9 +110,13 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
     if (confirm("⚠️ ¿Eliminar servicio?")) {
       try {
         await deleteDoc(doc(db, "services", service.id));
+        enqueueSnackbar("Servicio eliminado exitosamente.", {
+          variant: "success",
+        });
         onClose();
       } catch (e) {
         console.error(e);
+        enqueueSnackbar("Error al eliminar el servicio.", { variant: "error" });
       }
     }
   };
@@ -146,10 +151,11 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
       });
 
       setIsEditing(false);
+      enqueueSnackbar("Servicio actualizado exitosamente.", { variant: "success" });
       onClose();
     } catch (error) {
       console.error(error);
-      alert("Error");
+      enqueueSnackbar("Error al actualizar el servicio. Intente nuevamente.", { variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -264,7 +270,9 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 <select
                   required
                   value={formData.vehicleBay}
-                  onChange={(e) => setFormData({ ...formData, vehicleBay: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, vehicleBay: e.target.value })
+                  }
                   className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
                 >
                   <option value="0">Seleccionar...</option>

@@ -24,7 +24,7 @@ export default function MobileNav() {
 
       {/* Menú Desplegable (Overlay) */}
       {isOpen && (
-        <div className="absolute top-16 left-0 w-full bg-gray-900 border-b border-gray-800 shadow-xl animate-in slide-in-from-top-5">
+        <div className="absolute top-16 left-0 w-full bg-espuma-dark border-b border-gray-800 shadow-xl animate-in slide-in-from-top-5">
           <nav className="flex flex-col p-4 space-y-2">
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
@@ -34,7 +34,7 @@ export default function MobileNav() {
                   href={item.href}
                   onClick={() => setIsOpen(false)} // Cierra el menú al hacer clic
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive ? "bg-blue-600" : "hover:bg-gray-800"
+                    isActive ? "bg-espuma-red" : "hover:bg-gray-800"
                   }`}
                 >
                   <item.icon className="w-5 h-5" />

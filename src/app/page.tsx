@@ -125,6 +125,11 @@ export default function DashboardPage() {
     fetchData();
   }, [refreshTrigger]);
 
+  function onSuccess(): void {
+    setRefreshTrigger((prev) => prev + 1);
+    enqueueSnackbar("Servicio creado con éxito", { variant: "success" });
+  }
+
   return (
     <div className="p-6 space-y-8 min-h-screen">
       {/* <DatabaseFixer /> */}
@@ -350,7 +355,7 @@ export default function DashboardPage() {
       <NewServiceModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSuccess={() => setRefreshTrigger((prev) => prev + 1)}
+        onSuccess={onSuccess}
       />
 
       {selectedService && (
