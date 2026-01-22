@@ -20,7 +20,6 @@ import {
   PhoneCall,
   Trash2,
   Edit2,
-  Save,
   Coins,
   AlertCircle,
   CheckCircle2,
@@ -56,17 +55,18 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
 
   useEffect(() => {
     if (service) {
+      console.log("Cargando datos del servicio para edición:", service);
       setFormData({
         clientName: service.clientName,
         clientPhone: service.clientPhone || "",
         vehicleModel: service.vehicle?.model || "",
         vehicleColor: service.vehicle?.color || "",
         price: service.financials?.totalPrice || 0,
-        paymentMethod: service.financials?.paymentMethod || "Efectivo",
+        paymentMethod: service.financials?.paymentMethod || "",
         paymentStatus: service.paymentStatus || "paid", // Cargar estado
         washerId: service.washerId || "",
         tipAmount: service.financials?.tipAmount || 0,
-        tipMethod: service.financials?.tipMethod || "Efectivo",
+        tipMethod: service.financials?.tipMethod || "",
         vehicleBay: service.vehicle?.bay || "",
       });
     }
@@ -124,6 +124,27 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
   const handleUpdate = async () => {
     try {
       setLoading(true);
+      if (formData.price <= 0 && formData.paymentStatus === "paid") {
+        enqueueSnackbar("El precio del servicio debe ser mayor a $0.", {
+          variant: "warning",
+        });
+        return;
+      }
+      if (
+        formData.paymentMethod === "Pendiente" &&
+        formData.paymentStatus === "paid"
+      ) {
+        enqueueSnackbar("Seleccione un método de pago válido.", {
+          variant: "warning",
+        });
+        return;
+      }
+      if (formData.tipAmount > 0 && !formData.tipMethod) {
+        enqueueSnackbar("Seleccione un método de propina.", {
+          variant: "warning",
+        });
+        return;
+      }
       const commissionRate = commissionPercent / 100;
       const washerEarnings = formData.price * commissionRate;
       const businessEarnings = formData.price - washerEarnings;
@@ -151,11 +172,15 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
       });
 
       setIsEditing(false);
-      enqueueSnackbar("Servicio actualizado exitosamente.", { variant: "success" });
+      enqueueSnackbar("Servicio actualizado exitosamente.", {
+        variant: "success",
+      });
       onClose();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Error al actualizar el servicio. Intente nuevamente.", { variant: "error" });
+      enqueueSnackbar("Error al actualizar el servicio. Intente nuevamente.", {
+        variant: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -164,6 +189,12 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
   const dateStr = service.createdAt?.seconds
     ? new Date(service.createdAt.seconds * 1000).toLocaleString("es-PA")
     : "---";
+
+  function handleChangeEditing(): void {
+    event?.preventDefault?.();
+    // Re-sync form with current service data and enter edit mode
+    setIsEditing(true);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in zoom-in-95 duration-200">
@@ -184,7 +215,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
             {!isEditing && (
               <>
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleChangeEditing}
                   className="p-2 bg-white/10 hover:bg-blue-500/50 rounded-lg transition"
                 >
                   <Edit2 className="w-4 h-4" />
@@ -301,7 +332,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 </button>
                 <button
                   onClick={() =>
-                    setFormData({ ...formData, paymentStatus: "pending" })
+                    setFormData({ ...formData, paymentStatus: "pending", paymentMethod: "Pendiente" })
                   }
                   className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${formData.paymentStatus === "pending" ? "bg-red-500 text-white shadow-md" : "text-gray-500 hover:bg-gray-200"}`}
                 >
@@ -325,7 +356,11 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                       Método Pago
                     </label>
                     <select
-                      value={formData.paymentMethod}
+                      value={
+                        formData.paymentMethod === "Pendiente"
+                          ? ""
+                          : formData.paymentMethod
+                      }
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -334,6 +369,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                       }
                       className="w-full p-2 border rounded-lg bg-white text-sm font-medium h-[42px]"
                     >
+                      <option>Seleccionar...</option>
                       <option>Efectivo</option>
                       <option>Yappy</option>
                       <option>Tarjeta</option>
@@ -377,6 +413,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                   }
                   className="w-full p-2 border border-yellow-300 rounded-lg bg-white text-sm font-medium h-[42px]"
                 >
+                  <option>Seleccionar...</option>
                   <option>Efectivo</option>
                   <option>Yappy</option>
                   <option>Tarjeta</option>

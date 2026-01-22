@@ -329,7 +329,7 @@ export default function ReportsPage() {
     // --- SECCIÓN 4: CIERRE DE CAJA ---
     yPos = (doc as any).lastAutoTable.finalY + 15;
     doc.setFontSize(12);
-    doc.text("Desglose Ingresos (Ventas)", 14, yPos);
+    doc.text("Cierre de Caja", 14, yPos);
 
     autoTable(doc, {
       startY: yPos + 5,

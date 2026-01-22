@@ -121,8 +121,9 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
       setPaymentMethod("Efectivo");
       setHasTip(false);
       setTipAmount(0);
-      setTipMethod("Efectivo");
+      setTipMethod("Yappy");
       setShowSuggestions(false);
+      setTrack("0");
     }
   }, [isOpen]);
 
@@ -180,11 +181,11 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
       await addDoc(collection(db, "services"), {
         createdAt: Timestamp.now(),
         clientName: clientName || "Cliente General",
-        clientPhone: clientPhone || "",
+        clientPhone: clientPhone || "N/A",
         vehicle: {
           model: vehicleModel,
           color: vehicleColor || "No especificado",
-          bay: track,
+          bay: track || "N/A",
         },
 
         financials: {
@@ -420,8 +421,8 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
               <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
               <p className="text-red-800 font-bold">Servicio por Pagar</p>
               <p className="text-red-600 text-xs mt-1">
-                Se guardará en $0.00. Podrás ingresar el monto y el cobro cuando
-                el cliente retire el vehículo.
+                Se guardará en modo de espera. Podrás ingresar el monto y el cobro cuando
+                el cliente retire el vehículo. Tambien puedes dejar el monto preescrito ingresandolo en modo cobrar ahora y luego regresar a cambiar el estado a pendiente.
               </p>
             </div>
           ) : (
