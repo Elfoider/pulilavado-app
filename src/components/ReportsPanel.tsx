@@ -336,9 +336,9 @@ export default function ReportsPage() {
       head: [["Operación", "Monto"]],
       body: [
         ["Total del dia", `$${serviceSales.toFixed(2)}`],
-        ["Total Yappy", `$${incomeByMethod.Yappy.toFixed(2) + tipsByMethod.Yappy.toFixed(2)}`],
+        ["Total Yappy", `$${parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2))}`],
         ["Tarjeta", `$${incomeByMethod.Tarjeta.toFixed(2)}`],
-        ["Total Propina", `$${tipsByMethod.Efectivo.toFixed(2) + tipsByMethod.Yappy.toFixed(2) + tipsByMethod.Tarjeta.toFixed(2)}`],
+        ["Total Propina", `$${parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2))}`],
       ],
       theme: "grid",
     });
