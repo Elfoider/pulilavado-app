@@ -517,13 +517,13 @@ export default function ReportsPage() {
         </div>
 
         <div className="p-6 rounded-2xl bg-gradient-to-br from-espuma-blue to-cyan-600 text-white shadow-lg">
-          <p className="text-blue-100 text-xs font-bold uppercase tracking-wider mb-2">
+          <p className="text-gray-600 text-xs font-bold uppercase tracking-wider mb-2">
             Ganancia Negocio
           </p>
-          <h3 className="text-3xl font-black">
+          <h3 className="text-3xl font-black text-gray-700">
             ${netBusinessProfit.toFixed(2)}
           </h3>
-          <p className="text-blue-100 text-xs mt-1">Después de comisiones</p>
+          <p className="text-gray-600 text-xs mt-1">Después de comisiones</p>
         </div>
 
         <div className="p-6 rounded-2xl bg-orange-50 border border-orange-100">
