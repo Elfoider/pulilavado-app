@@ -23,6 +23,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
+import { formatMoney } from "@/lib/utils";
 
 // Interfaces
 interface PayrollItem {
@@ -263,7 +264,7 @@ export default function ReportsPage() {
     const tableData = payrollList.map((item) => [
       item.washerName,
       item.count,
-      `$${item.totalPay.toFixed(2)}`,
+      `${formatMoney(item.totalPay)}`,
     ]);
 
     autoTable(doc, {
@@ -279,7 +280,7 @@ export default function ReportsPage() {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(
-      `TOTAL NÓMINA A DISPERSAR: $${totalPayrollToPay.toFixed(2)}`,
+      `TOTAL NÓMINA A DISPERSAR: ${formatMoney(totalPayrollToPay)}`,
       14,
       finalY,
     );
@@ -321,7 +322,7 @@ export default function ReportsPage() {
     doc.text("CAJA NETA (Dinero Físico Real)", 20, 50);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(`$${netCashInRegister.toFixed(2)}`, 20, 58);
+    doc.text(`${formatMoney(netCashInRegister)}`, 20, 58);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -331,13 +332,13 @@ export default function ReportsPage() {
     let yPos = 75;
 
     const kpiData = [
-      ["Venta Servicios (Bruto)", `$${serviceSales.toFixed(2)}`],
-      ["Propinas Totales", `$${totalTips.toFixed(2)}`],
+      ["Venta Servicios (Bruto)", `${formatMoney(serviceSales)}`],
+      ["Propinas Totales", `${formatMoney(totalTips)}`],
       [
         "Salida Efectivo (Props. Digitales)",
-        `-$${digitalTipsPaidCash.toFixed(2)}`,
+        `-${formatMoney(digitalTipsPaidCash)}`,
       ],
-      ["GANANCIA NEGOCIO (Estimada)", `$${netBusinessProfit.toFixed(2)}`],
+      ["GANANCIA NEGOCIO (Estimada)", `${formatMoney(netBusinessProfit)}`],
     ];
 
     autoTable(doc, {
@@ -357,10 +358,10 @@ export default function ReportsPage() {
       startY: yPos + 5,
       head: [["Método", "Monto"]],
       body: [
-        ["Efectivo", `$${incomeByMethod.Efectivo.toFixed(2)}`],
-        ["Yappy", `$${incomeByMethod.Yappy.toFixed(2)}`],
-        ["Tarjeta", `$${incomeByMethod.Tarjeta.toFixed(2)}`],
-        ["ACH/Otro", `$${incomeByMethod.Transferencia.toFixed(2)}`],
+        ["Efectivo", `${formatMoney(incomeByMethod.Efectivo)}`],
+        ["Yappy", `${formatMoney(incomeByMethod.Yappy)}`],
+        ["Tarjeta", `${formatMoney(incomeByMethod.Tarjeta)}`],
+        ["ACH/Otro", `${formatMoney(incomeByMethod.Transferencia)}`],
       ],
       theme: "grid",
     });
@@ -374,15 +375,15 @@ export default function ReportsPage() {
       startY: yPos + 5,
       head: [["Operación", "Monto"]],
       body: [
-        ["Total del dia", `$${serviceSales.toFixed(2)}`],
+        ["Total del dia", `${formatMoney(serviceSales)}`],
         [
           "Total Yappy",
-          `$${parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2))}`,
+          `${formatMoney(parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)))}`,
         ],
-        ["Tarjeta", `$${incomeByMethod.Tarjeta.toFixed(2)}`],
+        ["Tarjeta", `${formatMoney(incomeByMethod.Tarjeta)}`],
         [
           "Total Propina",
-          `$${parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2))}`,
+          `${formatMoney(parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2)))}`,
         ],
       ],
       theme: "grid",
@@ -396,9 +397,9 @@ export default function ReportsPage() {
       startY: yPos + 5,
       head: [["Método", "Monto", "Efecto en Caja"]],
       body: [
-        ["Efectivo", `$${tipsByMethod.Efectivo.toFixed(2)}`, "Neutro"],
-        ["Yappy / Sin Esp.", `$${tipsByMethod.Yappy.toFixed(2)}`, "Resta Caja"],
-        ["Tarjeta", `$${tipsByMethod.Tarjeta.toFixed(2)}`, "Resta Caja"],
+        ["Efectivo", `${formatMoney(tipsByMethod.Efectivo)}`, "Neutro"],
+        ["Yappy / Sin Esp.", `${formatMoney(tipsByMethod.Yappy)}`, "Resta Caja"],
+        ["Tarjeta", `${formatMoney(tipsByMethod.Tarjeta)}`, "Resta Caja"],
       ],
       theme: "grid",
       headStyles: { fillColor: [243, 156, 18] }, // Naranja/Amarillo
@@ -495,7 +496,7 @@ export default function ReportsPage() {
               Efectivo Real en Caja
             </p>
             <h3 className="text-4xl font-black tracking-tight">
-              ${netCashInRegister.toFixed(2)}
+              {formatMoney(netCashInRegister)}
             </h3>
             <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
               <TrendingUp className="w-3 h-3 rotate-180" />
@@ -509,7 +510,7 @@ export default function ReportsPage() {
             Venta Servicios
           </p>
           <h3 className="text-3xl font-black text-gray-800">
-            ${serviceSales.toFixed(2)}
+            {formatMoney(serviceSales)}
           </h3>
           <p className="text-gray-400 text-xs mt-1">
             Total facturado en lavados
@@ -521,7 +522,7 @@ export default function ReportsPage() {
             Ganancia Negocio
           </p>
           <h3 className="text-3xl font-black text-gray-700">
-            ${netBusinessProfit.toFixed(2)}
+            {formatMoney(netBusinessProfit)}
           </h3>
           <p className="text-gray-600 text-xs mt-1">Después de comisiones</p>
         </div>
@@ -531,7 +532,7 @@ export default function ReportsPage() {
             Nómina a Pagar
           </p>
           <h3 className="text-3xl font-black text-orange-700">
-            ${totalPayrollToPay.toFixed(2)}
+            {formatMoney(totalPayrollToPay)}
           </h3>
           <p className="text-orange-600/70 text-xs mt-1">Solo comisiones</p>
         </div>
@@ -582,7 +583,7 @@ export default function ReportsPage() {
               Distribución de Propinas
             </h3>
             <span className="bg-yellow-100 text-yellow-800 text-xs font-bold px-2 py-1 rounded">
-              Total: ${totalTips.toFixed(2)}
+              Total: {formatMoney(totalTips)}
             </span>
           </div>
 
@@ -597,7 +598,7 @@ export default function ReportsPage() {
                 </p>
               </div>
               <p className="text-lg font-black text-blue-800">
-                ${tipsByMethod.Yappy.toFixed(2)}
+                {formatMoney(tipsByMethod.Yappy)}
               </p>
             </div>
             <div className="flex justify-between items-center p-6 bg-purple-50 border border-purple-100 rounded-xl">
@@ -610,7 +611,7 @@ export default function ReportsPage() {
                 </p>
               </div>
               <p className="text-lg font-black text-purple-800">
-                ${tipsByMethod.Tarjeta.toFixed(2)}
+                {formatMoney(tipsByMethod.Tarjeta)}
               </p>
             </div>
             <div className="flex justify-between items-center p-6 bg-green-50 border border-green-100 rounded-xl opacity-70">
@@ -621,7 +622,7 @@ export default function ReportsPage() {
                 <p className="text-[10px] text-green-600">Directo al lavador</p>
               </div>
               <p className="text-lg font-black text-green-800">
-                ${tipsByMethod.Efectivo.toFixed(2)}
+                {formatMoney(tipsByMethod.Efectivo)}
               </p>
             </div>
           </div>
@@ -678,7 +679,7 @@ function MethodCard({
   return (
     <div className={`p-4 rounded-xl border ${colors[color]}`}>
       <p className="text-[10px] font-bold uppercase opacity-70 mb-1">{title}</p>
-      <p className="text-xl font-black">${amount.toFixed(2)}</p>
+      <p className="text-xl font-black">{formatMoney(amount)}</p>
     </div>
   );
 }

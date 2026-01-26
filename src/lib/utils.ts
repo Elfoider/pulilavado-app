@@ -31,6 +31,15 @@ export function capitalizarPrimeraLetra(cadena: string): string {
   return cadena.charAt(0).toUpperCase() + cadena.slice(1);
 }
 
-export const versionSoft = "v1.1.2 - Sistema de Gestión";
+export const formatMoney = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
+
+export const versionSoft = "v1.2.0 - Sistema de Gestión";
 
 
