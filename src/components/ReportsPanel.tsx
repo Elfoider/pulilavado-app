@@ -38,7 +38,10 @@ export default function ReportsPage() {
   const [filterType, setFilterType] = useState<"today" | "week" | "custom">(
     "today",
   );
-  const [selectedDate, setSelectedDate] = useState<string>(
+  const [customStart, setCustomStart] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [customEnd, setCustomEnd] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
 
@@ -80,23 +83,58 @@ export default function ReportsPage() {
       if (filterType === "today") {
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
+        setCustomStart(startDate.toISOString().split("T")[0]);
+        setCustomEnd(startDate.toISOString().split("T")[0]);
       } else if (filterType === "week") {
-        const day = startDate.getDay();
-        const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
-        startDate.setDate(diff);
-        startDate.setHours(0, 0, 0, 0);
-        endDate = new Date();
-        endDate.setHours(23, 59, 59, 999);
+        const today = new Date();
+        const currentDay = today.getDay(); // 0=Domingo, 1=Lunes, 2=Martes...
+
+        // OBJETIVO: Encontrar el último Martes (Día 2)
+        // Si hoy es Martes (2), la distancia es 0.
+        // Si hoy es Miércoles (3), la distancia es 1 día atrás.
+        // Si hoy es Lunes (1), el martes pasado fue hace 6 días.
+        // Si hoy es Domingo (0), el martes pasado fue hace 5 días.
+
+        const cycleStartDay = 2; // 2 = Martes
+        let daysToSubtract = 0;
+
+        if (currentDay >= cycleStartDay) {
+          // Estamos dentro de la misma semana calendario (ej: Hoy es Jueves)
+          // Jueves (4) - Martes (2) = 2 días atrás
+          daysToSubtract = currentDay - cycleStartDay;
+        } else {
+          // Ya cruzamos al inicio de la semana calendario (ej: Hoy es Lunes o Domingo)
+          // Necesitamos ir al Martes de la semana ANTERIOR.
+          // Fórmula: (DíaActual - DíaMeta) + 7
+          // Ej Lunes (1): (1 - 2) + 7 = 6 días atrás
+          daysToSubtract = currentDay - cycleStartDay + 7;
+        }
+
+        // 1. Configurar Fecha de Inicio (El Martes calculado)
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - daysToSubtract);
+        startDate.setHours(0, 0, 0, 0); // Martes 00:00:00
+
+        // 2. Configurar Fecha Fin (Hoy, hasta el momento actual)
+        endDate = new Date(today);
+        endDate.setHours(0, 0, 0, 0);
+        setCustomStart(startDate.toISOString().split("T")[0]);
+        setCustomEnd(endDate.toISOString().split("T")[0]);
+        endDate.setHours(23, 59, 59, 999); // Hoy 23:59:59
       } else if (filterType === "custom") {
-        const [year, month, day] = selectedDate.split("-").map(Number);
-        startDate = new Date(year, month - 1, day, 0, 0, 0);
-        endDate = new Date(year, month - 1, day, 23, 59, 59);
+        // FECHA INICIO (00:00:00)
+        const [y1, m1, d1] = customStart.split("-").map(Number);
+        startDate = new Date(y1, m1 - 1, d1, 0, 0, 0);
+
+        // FECHA FIN (23:59:59)
+        const [y2, m2, d2] = customEnd.split("-").map(Number);
+        endDate = new Date(y2, m2 - 1, d2, 23, 59, 59, 999);
       }
 
       const q = query(
         collection(db, "services"),
         where("createdAt", ">=", Timestamp.fromDate(startDate)),
-        where("createdAt", "<=", Timestamp.fromDate(endDate)),
+        where("createdAt", "<=", Timestamp.fromDate(new Date(endDate))),
       );
 
       const snapshot = await getDocs(q);
@@ -196,7 +234,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchReport();
-  }, [filterType, selectedDate]);
+  }, [filterType, customStart, customEnd]);
 
   // ==========================================
   // 1. GENERAR PDF NÓMINA (PARA FIRMAR)
@@ -204,16 +242,17 @@ export default function ReportsPage() {
   const generatePayrollPDF = () => {
     const doc = new jsPDF();
     const todayStr = new Date().toLocaleDateString();
-
+    const rangeStr =
+      filterType === "custom"
+        ? `Del ${customStart} al ${customEnd}`
+        : filterType === "today"
+          ? todayStr
+          : "Semana Actual";
     // Encabezado
     doc.setFontSize(18);
     doc.text("MR. ESPUMA - REPORTE DE NÓMINA", 14, 20);
     doc.setFontSize(10);
-    doc.text(
-      `Fecha de Corte: ${filterType === "custom" ? selectedDate : todayStr}`,
-      14,
-      28,
-    );
+    doc.text(`Periodo: ${rangeStr}`, 14, 28);
     doc.text(
       "Concepto: Pago de Comisiones (Propinas pagadas diariamente)",
       14,
@@ -267,7 +306,7 @@ export default function ReportsPage() {
     doc.setTextColor(100);
     doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 28);
     doc.text(
-      `Filtro: ${filterType.toUpperCase()} ${filterType === "custom" ? selectedDate : ""}`,
+      `${filterType === "week" ? `Desde ${customStart} hasta ${customEnd}` : filterType === "custom" ? `${customStart} a ${customEnd}` : ""}`,
       14,
       33,
     );
@@ -336,9 +375,15 @@ export default function ReportsPage() {
       head: [["Operación", "Monto"]],
       body: [
         ["Total del dia", `$${serviceSales.toFixed(2)}`],
-        ["Total Yappy", `$${parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2))}`],
+        [
+          "Total Yappy",
+          `$${parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2))}`,
+        ],
         ["Tarjeta", `$${incomeByMethod.Tarjeta.toFixed(2)}`],
-        ["Total Propina", `$${parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2))}`],
+        [
+          "Total Propina",
+          `$${parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2))}`,
+        ],
       ],
       theme: "grid",
     });
@@ -394,17 +439,40 @@ export default function ReportsPage() {
 
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
 
-          <div className="flex items-center gap-2 relative">
-            <CalendarIcon className="w-4 h-4 text-gray-400 absolute left-3" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => {
-                setSelectedDate(e.target.value);
-                setFilterType("custom");
-              }}
-              className={`pl-9 pr-3 py-1.5 rounded-lg text-sm font-bold border outline-none focus:ring-2 focus:ring-espuma-blue ${filterType === "custom" ? "bg-white border-espuma-blue text-espuma-blue shadow-md" : "bg-transparent border-transparent text-gray-600"}`}
-            />
+          <div className="flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-gray-200">
+            {/* Input DESDE */}
+            <div className="flex flex-col">
+              <span className="text-[9px] text-gray-400 font-bold uppercase ml-1">
+                Desde
+              </span>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => {
+                  setCustomStart(e.target.value);
+                  setFilterType("custom"); // Activa modo custom automáticamente
+                }}
+                className={`text-xs font-bold outline-none bg-transparent ${filterType === "custom" ? "text-espuma-blue" : "text-gray-600"}`}
+              />
+            </div>
+
+            <span className="text-gray-300">-</span>
+
+            {/* Input HASTA */}
+            <div className="flex flex-col">
+              <span className="text-[9px] text-gray-400 font-bold uppercase ml-1">
+                Hasta
+              </span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => {
+                  setCustomEnd(e.target.value);
+                  setFilterType("custom");
+                }}
+                className={`text-xs font-bold outline-none bg-transparent ${filterType === "custom" ? "text-espuma-blue" : "text-gray-600"}`}
+              />
+            </div>
           </div>
 
           <button
