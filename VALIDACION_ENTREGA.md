@@ -1,4 +1,4 @@
-# Validación de Pulilavado 1.3.3
+# Validación de Pulilavado 1.3.4
 
 Base del código: repositorio Elfoider/pulilavado-app, rama master, commit 345ef6f5c6e316e8ae0b743b92c1f2f1f28a05b0.
 
@@ -38,3 +38,9 @@ El primer despliegue de 1.3.3 detectó una URL inexistente para adler-32 en pack
 Se compararon todas las versiones, URL, integridades y requisitos de las dependencias existentes con el lockfile del repositorio original: coinciden. Solo se mantienen los paquetes nuevos de Playwright para las pruebas. npm ci descargó e instaló 487 paquetes en un directorio aislado con caché vacía. No se requiere cambiar Firebase, Node.js ni las reglas de Firestore para este error.
 
 Con esa instalación limpia también aprobaron las 36 pruebas, ESLint y la compilación de producción. El despliegue remoto de App Hosting debe reintentarse con el commit corregido.
+
+## Nómina seleccionable 1.3.4
+
+39 pruebas aprobadas. Las tres nuevas ejecutan la carga, selección y exportación del componente con datos Firebase y PDF simulados. Comprueban selección por identificador con nombres iguales, suma de varios servicios de un mismo lavador, exclusión de pendientes/anulados, persistencia al actualizar, total y filas del PDF, seleccionar todos/quitar selección y bloqueo ante lista vacía, error o cambio de período. Las fechas de los controles se generan en hora local, sin desplazarlas al convertir a UTC. No se modificaron las versiones de dependencias.
+
+Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuración TLS descrita anteriormente). La instalación con caché vacía se validó al corregir 1.3.3; 1.3.4 conserva exactamente las dependencias de esa corrección.

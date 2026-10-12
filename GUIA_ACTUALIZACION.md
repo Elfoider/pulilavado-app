@@ -116,3 +116,11 @@ Las pruebas utilizan exclusivamente demo-pulilavado local. El test de interfaz l
 La versión sigue siendo una aplicación de una sola instancia/caja, sin organización/sede ni nuevos roles. Los listados de inventario muestran todos los productos; los historiales nuevos limitan a 150 movimientos de inventario/ventas y 100 cajas recientes para evitar lecturas ilimitadas. Los movimientos de cada caja se cargan en páginas de 100. Para auditorías históricas más extensas puede consultar Firestore; no se añadieron exportadores Excel/PDF de inventario ni paginación global de cajas.
 
 No se modificaron dependencias de producción ajenas al alcance. El ZIP incluye código fuente, lockfile, pruebas, índices y esta guía; no contiene dependencias instaladas, compilaciones, credenciales administrativas ni datos del negocio.
+
+## Nómina seleccionable (1.3.4)
+
+En Reportes y Finanzas seleccione primero Hoy, Esta Semana o un rango de fechas. La sección «Lavadores a incluir en la nómina» lista a quienes tienen servicios cobrados en el período. Todos aparecen seleccionados inicialmente. Marque o desmarque las casillas, o use «Seleccionar todos» y «Quitar selección». La elección se conserva al actualizar mientras la pantalla permanece abierta; al volver a entrar se seleccionan todos.
+
+El total de la selección aparece debajo de la lista. «Reporte de Pago de Nómina (PDF)» exporta solo los lavadores marcados, sus autos lavados, comisiones y espacio para firma. El botón se desactiva si no hay selección, durante la carga, al cambiar el período hasta completar la consulta o si esta falla. Los lavadores con el mismo nombre se distinguen por su identificador.
+
+La tarjeta general «Nómina a Pagar» mantiene el total de todo el período. La selección del PDF no recalcula los ingresos del negocio. La nómina sigue excluyendo propinas, pendientes y anulados, y usa la fecha de registro del servicio. Generar el PDF no registra ni marca un pago; para entregar dinero use un retiro en Caja. Esta actualización no incluye control de nóminas ya pagadas.

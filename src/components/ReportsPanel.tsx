@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -24,8 +24,12 @@ import autoTable from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
 
+const dateInputValue = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 // Interfaces
 interface PayrollItem {
+  washerId: string;
   washerName: string;
   count: number;
   totalPay: number; // Solo comisión
@@ -39,10 +43,10 @@ export default function ReportsPage() {
     "today",
   );
   const [customStart, setCustomStart] = useState<string>(
-    new Date().toISOString().split("T")[0],
+    dateInputValue(new Date()),
   );
   const [customEnd, setCustomEnd] = useState<string>(
-    new Date().toISOString().split("T")[0],
+    dateInputValue(new Date()),
   );
 
   // ESTADOS FINANCIEROS
@@ -70,10 +74,24 @@ export default function ReportsPage() {
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
   const [totalPayrollToPay, setTotalPayrollToPay] = useState(0);
+  const [excludedWasherIds, setExcludedWasherIds] = useState<string[]>([]);
+  const [reportError, setReportError] = useState("");
+  const [loadedReportKey, setLoadedReportKey] = useState("");
+  const reportRequest = useRef(0);
+  const reportKey = `${filterType}|${customStart}|${customEnd}`;
+  const reportReady = !loading && !reportError && loadedReportKey === reportKey;
+  const selectedPayroll = payrollList.filter(
+    (item) => !excludedWasherIds.includes(item.washerId),
+  );
+  const selectedPayrollTotal = selectedPayroll.reduce(
+    (sum, item) => sum + item.totalPay, 0,
+  );
 
   // --- FUNCIÓN DE CÁLCULO (IGUAL QUE ANTES) ---
   const fetchReport = useCallback(async () => {
+    const requestId = ++reportRequest.current;
     setLoading(true);
+    setReportError("");
     try {
       let startDate = new Date();
       let endDate = new Date();
@@ -81,8 +99,8 @@ export default function ReportsPage() {
       if (filterType === "today") {
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
-        setCustomStart(startDate.toISOString().split("T")[0]);
-        setCustomEnd(startDate.toISOString().split("T")[0]);
+        setCustomStart(dateInputValue(startDate));
+        setCustomEnd(dateInputValue(startDate));
       } else if (filterType === "week") {
         const today = new Date();
         const currentDay = today.getDay(); // 0=Domingo, 1=Lunes, 2=Martes...
@@ -116,8 +134,8 @@ export default function ReportsPage() {
         // 2. Configurar Fecha Fin (Hoy, hasta el momento actual)
         endDate = new Date(today);
         endDate.setHours(0, 0, 0, 0);
-        setCustomStart(startDate.toISOString().split("T")[0]);
-        setCustomEnd(endDate.toISOString().split("T")[0]);
+        setCustomStart(dateInputValue(startDate));
+        setCustomEnd(dateInputValue(endDate));
         endDate.setHours(23, 59, 59, 999); // Hoy 23:59:59
       } else if (filterType === "custom") {
         // FECHA INICIO (00:00:00)
@@ -162,7 +180,7 @@ export default function ReportsPage() {
           const fin = data.financials || {};
           const servicePrice = fin.totalPrice || 0;
           const tip = fin.tipAmount || 0;
-          const washerId = data.washerId;
+          const washerId = String(data.washerId || "legacy-unassigned");
           const washerName = data.washerName || "Desconocido";
           const washerEarn = fin.washerEarnings || 0;
 
@@ -197,7 +215,7 @@ export default function ReportsPage() {
 
           // Nómina
           if (!washerMap[washerId]) {
-            washerMap[washerId] = { washerName, count: 0, totalPay: 0 };
+            washerMap[washerId] = { washerId, washerName, count: 0, totalPay: 0 };
           }
           washerMap[washerId].count += 1;
           washerMap[washerId].totalPay += washerEarn;
@@ -206,6 +224,7 @@ export default function ReportsPage() {
 
       const salesSnap = await getDocs(query(collection(db, "sales"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
       salesSnap.forEach(s => { const sale = s.data(); if (sale.status !== "paid") return; const total = Number(sale.total || 0); tempServiceSales += total; tempBusiness += total; const pm = sale.paymentMethod as keyof typeof tempIncomeMethod; if (tempIncomeMethod[pm] !== undefined) tempIncomeMethod[pm] += total; });
+      if (requestId !== reportRequest.current) return;
       setServiceSales(tempServiceSales);
       setTotalTips(tempTips);
       setNetBusinessProfit(tempBusiness);
@@ -214,15 +233,18 @@ export default function ReportsPage() {
 
       setNetCashInRegister(tempIncomeMethod["Efectivo"] + tempTipsMethod["Efectivo"]);
 
-      const payrollArray = Object.values(washerMap);
+      const payrollArray = Object.values(washerMap).sort((a, b) => a.washerName.localeCompare(b.washerName));
       setPayrollList(payrollArray);
       setTotalPayrollToPay(
         payrollArray.reduce((acc, curr) => acc + curr.totalPay, 0),
       );
+      setLoadedReportKey(`${filterType}|${customStart}|${customEnd}`);
     } catch (error) {
+      if (requestId !== reportRequest.current) return;
+      setReportError("No se pudo cargar el reporte. Vuelva a actualizarlo antes de generar la nómina.");
       console.error("Error fetching report:", error);
     } finally {
-      setLoading(false);
+      if (requestId === reportRequest.current) setLoading(false);
     }
   }, [filterType, customStart, customEnd]);
 
@@ -234,6 +256,10 @@ export default function ReportsPage() {
   // 1. GENERAR PDF NÓMINA (PARA FIRMAR)
   // ==========================================
   const generatePayrollPDF = () => {
+    if (!reportReady || selectedPayroll.length === 0) {
+      enqueueSnackbar("Seleccione al menos un lavador del reporte cargado.", { variant: "warning" });
+      return;
+    }
     const doc = new jsPDF();
     const todayStr = new Date().toLocaleDateString();
     const rangeStr =
@@ -254,10 +280,11 @@ export default function ReportsPage() {
     );
 
     // Tabla
-    const tableData = payrollList.map((item) => [
+    const tableData = selectedPayroll.map((item) => [
       item.washerName,
       item.count,
       `${formatMoney(item.totalPay)}`,
+      "",
     ]);
 
     autoTable(doc, {
@@ -273,7 +300,7 @@ export default function ReportsPage() {
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(
-      `TOTAL NÓMINA A DISPERSAR: ${formatMoney(totalPayrollToPay)}`,
+      `TOTAL NÓMINA A DISPERSAR: ${formatMoney(selectedPayrollTotal)}`,
       14,
       finalY,
     );
@@ -620,11 +647,41 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <section className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4" aria-label="Selección de lavadores para nómina">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Lavadores a incluir en la nómina</h3>
+            <p className="text-sm text-gray-500">Marque a quienes va a pagar en el período elegido. El PDF incluye sus comisiones y espacio para firmar.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!reportReady || payrollList.length === 0} onClick={() => setExcludedWasherIds([])} className="border rounded-lg px-3 py-2 text-sm disabled:opacity-50">Seleccionar todos</button>
+            <button type="button" disabled={!reportReady || payrollList.length === 0} onClick={() => setExcludedWasherIds(payrollList.map((item) => item.washerId))} className="border rounded-lg px-3 py-2 text-sm disabled:opacity-50">Quitar selección</button>
+          </div>
+        </div>
+        {reportError && <p role="alert" className="text-red-700 text-sm">{reportError}</p>}
+        {!reportReady ? <p className="text-sm text-gray-500">{reportError ? "Actualice el reporte para continuar." : "Cargando nómina del período…"}</p> : payrollList.length === 0 ? <p className="text-sm text-gray-500">No hay lavadores con servicios cobrados en este período.</p> : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b text-left"><th className="p-3">Incluir</th><th className="p-3">Lavador</th><th className="p-3 text-right">Autos lavados</th><th className="p-3 text-right">Comisión a pagar</th></tr></thead>
+              <tbody>{payrollList.map((item) => (
+                <tr key={item.washerId} className="border-b">
+                  <td className="p-3"><input type="checkbox" aria-label={`Incluir a ${item.washerName} en la nómina (${item.washerId})`} checked={!excludedWasherIds.includes(item.washerId)} onChange={(e) => setExcludedWasherIds((previous) => e.target.checked ? previous.filter((id) => id !== item.washerId) : [...previous, item.washerId])} className="h-5 w-5 accent-cyan-700" /></td>
+                  <td className="p-3 font-medium">{item.washerName}</td><td className="p-3 text-right">{item.count}</td><td className="p-3 text-right whitespace-nowrap">{formatMoney(item.totalPay)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+        )}
+        {reportReady && <p className="font-bold text-gray-800">Seleccionados: {selectedPayroll.length} de {payrollList.length} · Total a pagar: {formatMoney(selectedPayrollTotal)}</p>}
+        <p className="text-xs text-gray-500">Generar el reporte no registra el pago. Para entregar el dinero, registre el retiro correspondiente en Caja.</p>
+      </section>
+
       {/* BOTONES PDF */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <button
           onClick={generatePayrollPDF}
-          className="group relative overflow-hidden bg-white border-2 border-orange-500 text-orange-600 py-4 rounded-xl font-bold hover:bg-orange-50 transition flex flex-col items-center justify-center gap-1 shadow-sm hover:shadow-md"
+          disabled={!reportReady || selectedPayroll.length === 0}
+          className="group relative overflow-hidden bg-white border-2 border-orange-500 text-orange-600 py-4 rounded-xl font-bold hover:bg-orange-50 transition flex flex-col items-center justify-center gap-1 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <div className="flex items-center gap-2">
             <FileText className="w-6 h-6" />
