@@ -30,3 +30,11 @@ Estas pruebas de dominio y renderizado no sustituyen una prueba conectada a Fire
 ## Ajuste visual 1.3.3
 
 La sección de caja anterior se muestra únicamente mientras está abierta. Al cerrarla desaparece de la pantalla sin borrar o modificar sus datos. La prueba de renderizado existente confirma que una caja anterior cerrada permite abrir jornada y no muestra el recuadro amarillo.
+
+## Corrección de instalación en App Hosting
+
+El primer despliegue de 1.3.3 detectó una URL inexistente para adler-32 en package-lock.json. La sustitución global del número de versión había alterado esa dependencia y dos rangos internos. Se restauraron adler-32 1.3.1, array.prototype.flatmap ^1.3.2 y array.prototype.flat ^1.3.1. La aplicación permanece en 1.3.3.
+
+Se compararon todas las versiones, URL, integridades y requisitos de las dependencias existentes con el lockfile del repositorio original: coinciden. Solo se mantienen los paquetes nuevos de Playwright para las pruebas. npm ci descargó e instaló 487 paquetes en un directorio aislado con caché vacía. No se requiere cambiar Firebase, Node.js ni las reglas de Firestore para este error.
+
+Con esa instalación limpia también aprobaron las 36 pruebas, ESLint y la compilación de producción. El despliegue remoto de App Hosting debe reintentarse con el commit corregido.
