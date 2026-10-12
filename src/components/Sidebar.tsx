@@ -6,7 +6,6 @@ import {
   Droplets,
 } from "lucide-react";
 import { menuItems, versionSoft } from "@/lib/utils";
-import { Timestamp } from "firebase/firestore";
 
 export default function Sidebar() {
   const pathname = usePathname();

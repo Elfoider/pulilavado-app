@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -16,7 +16,6 @@ import {
   DollarSign,
   Banknote,
   FileText,
-  Calendar as CalendarIcon,
 } from "lucide-react";
 
 // --- IMPORTAR LIBRERÍAS DE PDF ---
@@ -47,7 +46,6 @@ export default function ReportsPage() {
   );
 
   // ESTADOS FINANCIEROS
-  const [totalRevenue, setTotalRevenue] = useState(0);
   const [serviceSales, setServiceSales] = useState(0);
   const [netBusinessProfit, setNetBusinessProfit] = useState(0);
   const [totalTips, setTotalTips] = useState(0);
@@ -68,14 +66,13 @@ export default function ReportsPage() {
 
   // CAJA REAL
   const [netCashInRegister, setNetCashInRegister] = useState(0);
-  const [digitalTipsPaidCash, setDigitalTipsPaidCash] = useState(0); // Dato útil para el reporte
 
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
   const [totalPayrollToPay, setTotalPayrollToPay] = useState(0);
 
   // --- FUNCIÓN DE CÁLCULO (IGUAL QUE ANTES) ---
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     setLoading(true);
     try {
       let startDate = new Date();
@@ -158,11 +155,10 @@ export default function ReportsPage() {
       };
       const washerMap: Record<string, PayrollItem> = {};
 
-      let cashOutflowForTips = 0;
 
       snapshot.forEach((doc) => {
         const data = doc.data();
-        if (data.status !== "cancelled") {
+        if (data.status !== "cancelled" && data.paymentStatus !== "pending") {
           const fin = data.financials || {};
           const servicePrice = fin.totalPrice || 0;
           const tip = fin.tipAmount || 0;
@@ -196,10 +192,7 @@ export default function ReportsPage() {
               tempTipsMethod["Yappy"] += tip;
             }
 
-            // Si NO es efectivo, significa que entró digital y SALE efectivo de caja
-            if (safeTipMethod !== "Efectivo") {
-              cashOutflowForTips += tip;
-            }
+
           }
 
           // Nómina
@@ -211,15 +204,15 @@ export default function ReportsPage() {
         }
       });
 
+      const salesSnap = await getDocs(query(collection(db, "sales"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
+      salesSnap.forEach(s => { const sale = s.data(); if (sale.status !== "paid") return; const total = Number(sale.total || 0); tempServiceSales += total; tempBusiness += total; const pm = sale.paymentMethod as keyof typeof tempIncomeMethod; if (tempIncomeMethod[pm] !== undefined) tempIncomeMethod[pm] += total; });
       setServiceSales(tempServiceSales);
       setTotalTips(tempTips);
-      setTotalRevenue(tempServiceSales + tempTips);
       setNetBusinessProfit(tempBusiness);
       setIncomeByMethod(tempIncomeMethod);
       setTipsByMethod(tempTipsMethod);
 
-      setDigitalTipsPaidCash(cashOutflowForTips);
-      setNetCashInRegister(tempIncomeMethod["Efectivo"] - cashOutflowForTips);
+      setNetCashInRegister(tempIncomeMethod["Efectivo"] + tempTipsMethod["Efectivo"]);
 
       const payrollArray = Object.values(washerMap);
       setPayrollList(payrollArray);
@@ -231,11 +224,11 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filterType, customStart, customEnd]);
 
   useEffect(() => {
     fetchReport();
-  }, [filterType, customStart, customEnd]);
+  }, [fetchReport]);
 
   // ==========================================
   // 1. GENERAR PDF NÓMINA (PARA FIRMAR)
@@ -276,7 +269,7 @@ export default function ReportsPage() {
     });
 
     // Totales
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
     doc.text(
@@ -319,26 +312,22 @@ export default function ReportsPage() {
 
     doc.setFontSize(14);
     doc.setTextColor(0);
-    doc.text("CAJA NETA (Dinero Físico Real)", 20, 50);
+    doc.text("COBROS EN EFECTIVO DEL PERIODO", 20, 50);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
     doc.text(`${formatMoney(netCashInRegister)}`, 20, 58);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("(Ventas Efectivo - Propinas Digitales Pagadas)", 100, 58);
+    doc.text("(Ventas y propinas recibidas en efectivo)", 100, 58);
 
     // --- SECCIÓN 2: ESTADÍSTICAS ---
     let yPos = 75;
 
     const kpiData = [
-      ["Venta Servicios (Bruto)", `${formatMoney(serviceSales)}`],
+      ["Ventas servicios y productos", `${formatMoney(serviceSales)}`],
       ["Propinas Totales", `${formatMoney(totalTips)}`],
-      [
-        "Salida Efectivo (Props. Digitales)",
-        `-${formatMoney(digitalTipsPaidCash)}`,
-      ],
-      ["GANANCIA NEGOCIO (Estimada)", `${formatMoney(netBusinessProfit)}`],
+      ["Ingresos despues de comisiones", `${formatMoney(netBusinessProfit)}`],
     ];
 
     autoTable(doc, {
@@ -350,7 +339,7 @@ export default function ReportsPage() {
     });
 
     // --- SECCIÓN 3: DESGLOSE SERVICIOS ---
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
     doc.setFontSize(12);
     doc.text("Desglose Ingresos (Ventas)", 14, yPos);
 
@@ -367,9 +356,9 @@ export default function ReportsPage() {
     });
 
     // --- SECCIÓN 4: CIERRE DE CAJA ---
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
     doc.setFontSize(12);
-    doc.text("Cierre de Caja", 14, yPos);
+    doc.text("Resumen de cobros", 14, yPos);
 
     autoTable(doc, {
       startY: yPos + 5,
@@ -390,16 +379,16 @@ export default function ReportsPage() {
     });
 
     // --- SECCIÓN 5: DESGLOSE PROPINAS ---
-    yPos = (doc as any).lastAutoTable.finalY + 15;
+    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
     doc.text("Desglose Propinas (Origen)", 14, yPos);
 
     autoTable(doc, {
       startY: yPos + 5,
       head: [["Método", "Monto", "Efecto en Caja"]],
       body: [
-        ["Efectivo", `${formatMoney(tipsByMethod.Efectivo)}`, "Neutro"],
-        ["Yappy / Sin Esp.", `${formatMoney(tipsByMethod.Yappy)}`, "Resta Caja"],
-        ["Tarjeta", `${formatMoney(tipsByMethod.Tarjeta)}`, "Resta Caja"],
+        ["Efectivo", `${formatMoney(tipsByMethod.Efectivo)}`, "Ingreso efectivo"],
+        ["Yappy / Sin Esp.", `${formatMoney(tipsByMethod.Yappy)}`, "Ingreso digital"],
+        ["Tarjeta", `${formatMoney(tipsByMethod.Tarjeta)}`, "Ingreso digital"],
       ],
       theme: "grid",
       headStyles: { fillColor: [243, 156, 18] }, // Naranja/Amarillo
@@ -478,6 +467,7 @@ export default function ReportsPage() {
 
           <button
             onClick={fetchReport}
+            disabled={loading}
             className="ml-2 bg-espuma-blue hover:bg-cyan-700 text-white p-2 rounded-lg transition shadow-md shadow-cyan-500/20"
           >
             <TrendingUp className="w-5 h-5" />
@@ -485,6 +475,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <p className="text-sm text-gray-600">Este reporte usa la fecha de registro del servicio o venta y excluye pendientes y anulados. Para cobros por fecha de pago, fondo inicial, gastos, retiros y arqueo consulte <a href="/cash" className="underline text-cyan-700">Caja</a>. Las propinas digitales no descuentan efectivo automáticamente.</p>
       {/* KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 border border-gray-700 relative overflow-hidden">
@@ -493,38 +484,38 @@ export default function ReportsPage() {
           </div>
           <div className="relative z-10">
             <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">
-              Efectivo Real en Caja
+              Cobros en efectivo
             </p>
             <h3 className="text-4xl font-black tracking-tight">
               {formatMoney(netCashInRegister)}
             </h3>
             <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
               <TrendingUp className="w-3 h-3 rotate-180" />
-              <span>Desc. propinas digitales</span>
+              <span>Ventas + propinas en efectivo</span>
             </div>
           </div>
         </div>
 
         <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">
-            Venta Servicios
+            Ventas de servicios y productos
           </p>
           <h3 className="text-3xl font-black text-gray-800">
             {formatMoney(serviceSales)}
           </h3>
           <p className="text-gray-400 text-xs mt-1">
-            Total facturado en lavados
+            Total cobrado en servicios y productos
           </p>
         </div>
 
         <div className="p-6 rounded-2xl bg-gradient-to-br from-espuma-blue to-cyan-600 text-white shadow-lg">
           <p className="text-gray-600 text-xs font-bold uppercase tracking-wider mb-2">
-            Ganancia Negocio
+            Ingresos del negocio
           </p>
           <h3 className="text-3xl font-black text-gray-700">
             {formatMoney(netBusinessProfit)}
           </h3>
-          <p className="text-gray-600 text-xs mt-1">Después de comisiones</p>
+          <p className="text-gray-600 text-xs mt-1">Después de comisiones; antes de costos y gastos</p>
         </div>
 
         <div className="p-6 rounded-2xl bg-orange-50 border border-orange-100">

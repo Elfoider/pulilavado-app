@@ -1,5 +1,6 @@
 "use client"
 
+import { useId } from 'react';
 import { DollarSign } from 'lucide-react';
 
 interface MoneyInputProps {
@@ -10,7 +11,7 @@ interface MoneyInputProps {
 }
 
 export default function MoneyInput({ label, value, onChange, disabled }: MoneyInputProps) {
-  
+  const inputId = useId();
   // Función que maneja el cambio "estilo Banco"
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // 1. Obtener solo los números de lo que el usuario escribió (eliminar letras, puntos, simbolos)
@@ -34,7 +35,7 @@ export default function MoneyInput({ label, value, onChange, disabled }: MoneyIn
 
   return (
     <div>
-      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+      <label htmlFor={inputId} className="block text-xs font-bold text-gray-500 uppercase mb-1">
         {label}
       </label>
       <div className="relative">
@@ -42,6 +43,7 @@ export default function MoneyInput({ label, value, onChange, disabled }: MoneyIn
           <DollarSign className="h-5 w-5 text-gray-400" />
         </div>
         <input
+          id={inputId}
           type="text"
           inputMode="numeric" // Activa teclado numérico en celulares
           value={displayValue()} // Mostramos "20.00"

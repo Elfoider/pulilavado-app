@@ -23,8 +23,9 @@ export interface Washer {
   id: string; // ID de Firebase
   name: string;
   phone: string;
-  startDate: any; // Timestamp
+  startDate?: { seconds: number }; // Timestamp
   active: boolean;
+  commissionPercentage?: number | null;
   photoUrl?: string; // Opcional
 }
 
@@ -42,7 +43,12 @@ export interface ServiceDocument {
     color: string;
     bay: string;
   };
+  status?: string;
+  cashSessionId?: string | null;
+  products?: import("@/lib/operations/model").ProductLine[];
   financials: {
+    servicePrice?: number;
+    productsTotal?: number;
     totalPrice: number;
     paymentMethod: PaymentMethod;
     commissionRate: number;
@@ -52,5 +58,5 @@ export interface ServiceDocument {
     tipMethod: PaymentMethod | null;
   };
   observations: string;
-  createdAt: any; // FieldValue de Firebase
+  createdAt?: { seconds: number }; // FieldValue de Firebase
 }

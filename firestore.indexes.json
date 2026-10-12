@@ -1,0 +1,7 @@
+{
+  "indexes": [
+    { "collectionGroup": "cashMovements", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "sessionId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" }] },
+    { "collectionGroup": "services", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "washerId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}

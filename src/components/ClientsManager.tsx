@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, deleteDoc } from 'firebase/firestore';
-import { Search, UserPlus, Star, Phone, Calendar, Trash2, Pencil, X } from 'lucide-react'; // <--- Nuevos Iconos
+import { Search, UserPlus, Star, Phone, Trash2, Pencil, X } from 'lucide-react'; // <--- Nuevos Iconos
 
 interface Client {
   id: string;
@@ -11,7 +11,7 @@ interface Client {
   phone: string;
   frequent: boolean;
   notes?: string;
-  lastVisit?: any;
+  lastVisit?: { seconds: number };
 }
 
 export default function ClientsManager() {
@@ -179,7 +179,7 @@ export default function ClientsManager() {
                         </div>
                     </div>
                 </div>
-                {client.notes && <p className="mt-3 text-xs text-gray-500 italic">"{client.notes}"</p>}
+                {client.notes && <p className="mt-3 text-xs text-gray-500 italic">&quot;{client.notes}&quot;</p>}
             </div>
         ))}
       </div>

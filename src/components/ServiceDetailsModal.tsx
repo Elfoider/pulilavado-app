@@ -3,13 +3,11 @@
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
 import {
-  doc,
-  updateDoc,
-  deleteDoc,
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
-  where,
 } from "firebase/firestore";
 import {
   X,
@@ -25,6 +23,9 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { ServiceDocument, Washer } from "@/types";
+import ProductCart from "./ProductCart";
+import { CartItem, commission, money } from "@/lib/operations/model";
+import { operations } from "@/lib/operations";
 import MoneyInput from "./MoneyInput";
 import { enqueueSnackbar } from "notistack";
 
@@ -34,10 +35,11 @@ interface Props {
 }
 
 export default function ServiceDetailsModal({ service, onClose }: Props) {
+  const [cart, setCart] = useState<CartItem[]>(service.products?.map(l => ({ productId: l.productId, quantity: l.quantity })) ?? []);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [washers, setWashers] = useState<Washer[]>([]);
-  const [commissionPercent, setCommissionPercent] = useState(35);
+  const [commissionPercent, setCommissionPercent] = useState(40);
 
   const [formData, setFormData] = useState({
     clientName: "",
@@ -61,7 +63,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         clientPhone: service.clientPhone || "",
         vehicleModel: service.vehicle?.model || "",
         vehicleColor: service.vehicle?.color || "",
-        price: service.financials?.totalPrice || 0,
+        price: service.financials?.servicePrice ?? service.financials?.totalPrice ?? 0,
         paymentMethod: service.financials?.paymentMethod || "",
         paymentStatus: service.paymentStatus || "paid", // Cargar estado
         washerId: service.washerId || "",
@@ -73,24 +75,18 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
 
     const initData = async () => {
       // ... (misma lógica de carga de lavadores y config)
-      const qWashers = query(
-        collection(db, "washers"),
-        where("active", "==", true),
-      );
+      const qWashers = query(collection(db, "washers"));
       const snapWashers = await getDocs(qWashers);
       setWashers(
         snapWashers.docs.map(
           (doc) => ({ id: doc.id, ...doc.data() }) as Washer,
         ),
       );
-      const snapConfig = await getDocs(collection(db, "settings"));
-      if (!snapConfig.empty) {
-        const configData = snapConfig.docs[0].data();
-        if (configData.defaultCommissionPercentage)
-          setCommissionPercent(configData.defaultCommissionPercentage);
-      }
+      const snapConfig = await getDoc(doc(db, "settings", "global"));
+      setCommissionPercent(snapConfig.data()?.defaultCommissionPercentage ?? 40);
+
     };
-    initData();
+    initData().catch(() => enqueueSnackbar("No se pudo cargar la configuración del servicio.", {variant:"error"}));
   }, [service]);
 
   if (!service) return null;
@@ -107,24 +103,19 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
       window.location.href = `tel:${formData.clientPhone}`;
   };
   const handleDelete = async () => {
-    if (confirm("⚠️ ¿Eliminar servicio?")) {
-      try {
-        await deleteDoc(doc(db, "services", service.id));
-        enqueueSnackbar("Servicio eliminado exitosamente.", {
-          variant: "success",
-        });
-        onClose();
-      } catch (e) {
-        console.error(e);
-        enqueueSnackbar("Error al eliminar el servicio.", { variant: "error" });
-      }
-    }
+    if (loading) return;
+    const reason = prompt("Motivo de anulación del servicio. Se devolverán los productos y se revertirá el cobro de una caja abierta.");
+    if (!reason) return;
+    setLoading(true);
+    try { await operations.cancelService(service.id, reason); enqueueSnackbar("Servicio anulado.", {variant:"success"}); onClose(); }
+    catch(e) { enqueueSnackbar(e instanceof Error ? e.message : "No se pudo anular.", {variant:"error"}); }
+    finally { setLoading(false); }
   };
 
   const handleUpdate = async () => {
     try {
       setLoading(true);
-      if (formData.price <= 0 && formData.paymentStatus === "paid") {
+      if (formData.price <= 0 && cart.length === 0 && formData.paymentStatus === "paid") {
         enqueueSnackbar("El precio del servicio debe ser mayor a $0.", {
           variant: "warning",
         });
@@ -145,31 +136,11 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
         });
         return;
       }
-      const commissionRate = commissionPercent / 100;
-      const washerEarnings = formData.price * commissionRate;
-      const businessEarnings = formData.price - washerEarnings;
-
-      const selectedWasher = washers.find((w) => w.id === formData.washerId);
-      const washerName = selectedWasher
-        ? selectedWasher.name
-        : service.washerName;
-
-      await updateDoc(doc(db, "services", service.id), {
-        clientName: formData.clientName,
-        clientPhone: formData.clientPhone,
-        "vehicle.model": formData.vehicleModel,
-        "vehicle.color": formData.vehicleColor,
-        "vehicle.bay": formData.vehicleBay,
-        "financials.totalPrice": formData.price,
-        "financials.washerEarnings": washerEarnings,
-        "financials.businessEarnings": businessEarnings,
-        "financials.tipAmount": formData.tipAmount,
-        "financials.tipMethod": formData.tipMethod,
-        "financials.paymentMethod": formData.paymentMethod,
-        paymentStatus: formData.paymentStatus, // Guardar status
-        washerId: formData.washerId,
-        washerName: washerName,
-      });
+      await operations.saveService({ clientName: formData.clientName, clientPhone: formData.clientPhone,
+        vehicle: { model: formData.vehicleModel, color: formData.vehicleColor, bay: formData.vehicleBay },
+        washerId: formData.washerId, servicePrice: formData.price, paymentStatus: formData.paymentStatus,
+        paymentMethod: formData.paymentMethod, tipAmount: formData.tipAmount, tipMethod: formData.tipMethod, cart,
+      }, service.id, false);
 
       setIsEditing(false);
       enqueueSnackbar("Servicio actualizado exitosamente.", {
@@ -178,7 +149,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
       onClose();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Error al actualizar el servicio. Intente nuevamente.", {
+      enqueueSnackbar(error instanceof Error ? error.message : "Error al actualizar el servicio.", {
         variant: "error",
       });
     } finally {
@@ -186,12 +157,14 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
     }
   };
 
+  const displayedRate = service.washerId === formData.washerId ? (service.financials.commissionRate ?? 0.4) : commission(washers.find(w => w.id === formData.washerId)?.commissionPercentage, commissionPercent);
+  const productsTotal = service.financials.productsTotal ?? 0;
   const dateStr = service.createdAt?.seconds
     ? new Date(service.createdAt.seconds * 1000).toLocaleString("es-PA")
     : "---";
 
   function handleChangeEditing(): void {
-    event?.preventDefault?.();
+
     // Re-sync form with current service data and enter edit mode
     setIsEditing(true);
   }
@@ -212,7 +185,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
             {isEditing ? "Editando Servicio" : "Detalles"}
           </h2>
           <div className="flex gap-2">
-            {!isEditing && (
+            {!isEditing && service.status !== "cancelled" && (
               <>
                 <button
                   onClick={handleChangeEditing}
@@ -222,6 +195,8 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 </button>
                 <button
                   onClick={handleDelete}
+                  disabled={loading}
+                  title="Anular servicio"
                   className="p-2 bg-white/10 hover:bg-red-500/50 rounded-lg transition text-red-300 hover:text-white"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -345,7 +320,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 className={`p-4 rounded-xl border space-y-3 ${formData.paymentStatus === "pending" ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
               >
                 <MoneyInput
-                  label="Precio Servicio"
+                  label="Precio del lavado"
                   value={formData.price}
                   onChange={(val) => setFormData({ ...formData, price: val })}
                 />
@@ -397,6 +372,8 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 </div>
               </div>
 
+              <ProductCart value={cart} onChange={setCart} previous={service.products ?? []} servicePrice={formData.price} tipAmount={formData.paymentStatus === "paid" ? formData.tipAmount : 0} />
+              <p className="text-xs text-gray-600">Comisión del lavado: {(displayedRate * 100).toFixed(2)}%. Los productos se suman al lavado. Los cobros requieren caja abierta.</p>
               {/* Propinas (Igual que antes) */}
               <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200 space-y-3">
                 <MoneyInput
@@ -439,6 +416,8 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
           ) : (
             // --- MODO VISUALIZACIÓN ---
             <>
+              {service.status === "cancelled" && <p className="rounded-xl bg-gray-100 p-3 font-bold">Servicio anulado. Este registro se conserva para consulta.</p>}
+              {(service.products?.length ?? 0) > 0 && <section className="border rounded-xl p-4 space-y-2"><h3 className="font-bold">Productos del servicio</h3>{service.products?.map(l => <p className="text-sm flex justify-between" key={l.productId}><span>{l.quantity} × {l.name}</span><b>${l.total.toFixed(2)}</b></p>)}<p className="text-sm text-gray-500">Lavado: ${formData.price.toFixed(2)} · Productos: ${productsTotal.toFixed(2)}</p></section>}
               {formData.paymentStatus === "pending" && (
                 <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 font-bold animate-pulse">
                   <AlertCircle className="w-5 h-5" />
@@ -518,7 +497,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                       Cobro Servicio
                     </p>
                     <span className="text-2xl font-black text-gray-800">
-                      ${formData.price.toFixed(2)}
+                      ${money(formData.price + productsTotal).toFixed(2)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-600">
@@ -537,10 +516,10 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                   </div>
                   <div className="mt-2 pt-2 border-t border-espuma-blue/10 flex justify-between text-sm">
                     <span className="text-gray-500">
-                      Comisión Lavador ({commissionPercent}%):
+                      Comisión Lavador ({(displayedRate * 100).toFixed(2)}%):
                     </span>
                     <span className="font-bold text-green-600">
-                      ${(formData.price * (commissionPercent / 100)).toFixed(2)}
+                      ${(money(formData.price * displayedRate)).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -571,7 +550,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                   <span className="font-black text-lg text-green-600">
                     $
                     {(
-                      formData.price * (commissionPercent / 100) +
+                      money(formData.price * displayedRate) +
                       formData.tipAmount
                     ).toFixed(2)}
                   </span>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { Washer } from "@/types";
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { 
@@ -22,7 +23,7 @@ export default function WasherProfilePage() {
   const { id } = useParams(); // Obtener ID del lavador de la URL
   const router = useRouter();
   
-  const [washer, setWasher] = useState<any>(null);
+  const [washer, setWasher] = useState<Washer | null>(null);
   const [loading, setLoading] = useState(true);
   
   // --- ESTADOS PARA MÉTRICAS DIARIAS ---
@@ -40,7 +41,7 @@ export default function WasherProfilePage() {
       if (!id) return;
       const docSnap = await getDoc(doc(db, "washers", id as string));
       if (docSnap.exists()) {
-        setWasher(docSnap.data());
+        setWasher({ ...docSnap.data(), id: docSnap.id } as Washer);
       }
     };
     fetchWasher();
@@ -80,8 +81,8 @@ export default function WasherProfilePage() {
             tempCount++;
             const fin = data.financials || {};
             
-            tempEarnings += (fin.washerEarnings || 0);
-            tempTips += (fin.tipAmount || 0);
+            tempEarnings += data.paymentStatus === "pending" ? 0 : (fin.washerEarnings || 0);
+            tempTips += data.paymentStatus === "pending" ? 0 : (fin.tipAmount || 0);
 
             servicesList.push({
               id: doc.id,

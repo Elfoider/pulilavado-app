@@ -84,7 +84,7 @@ export default function HistoryPage() {
           }) as ServiceWithId,
       );
 
-      setServices(data);
+      setServices(data.filter(s => s.status !== "cancelled"));
 
       // --- CÁLCULOS DETALLADOS ---
       let income = 0;
@@ -100,6 +100,7 @@ export default function HistoryPage() {
         aACH = 0;
 
       data.forEach((svc) => {
+        if (svc.paymentStatus === "pending" || svc.status === "cancelled") return;
         const total = svc.financials.totalPrice || 0;
         income += total;
         console.log(

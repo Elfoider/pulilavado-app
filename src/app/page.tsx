@@ -21,15 +21,16 @@ import {
 } from "lucide-react";
 import NewServiceModal from "@/components/NewServiceModal";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
-import DatabaseFixer from "@/components/DatabaseFilter";
+import { ServiceDocument } from "@/types";
+interface WasherStats { id: string; name: string; cars: number; earnings: number; tipsReceived: number }
 import { enqueueSnackbar } from "notistack";
 
 export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<any | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceDocument | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<ServiceDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [stats, setStats] = useState({
@@ -38,7 +39,7 @@ export default function DashboardPage() {
     totalCars: 0,
     pendingCount: 0, // Nueva estadística para saber cuántos deben
     bestWasherName: "Nadie aún",
-    washerStats: [] as any[],
+    washerStats: [] as WasherStats[],
   });
 
   const fetchData = async () => {
@@ -57,15 +58,16 @@ export default function DashboardPage() {
       );
 
       const snapshot = await getDocs(q);
-      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setServices(data);
+      const data = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as ServiceDocument);
+      const activeData = data.filter((svc) => svc.status !== "cancelled");
+      setServices(activeData);
 
       let sales = 0;
       let tips = 0;
       let pendingCount = 0;
-      const washerMap: Record<string, any> = {};
+      const washerMap: Record<string, WasherStats> = {};
 
-      data.forEach((svc: any) => {
+      activeData.forEach((svc) => {
         const isPending = svc.paymentStatus === "pending";
 
         // Si es pendiente, lo contamos pero NO sumamos el dinero a la caja del día
@@ -97,6 +99,8 @@ export default function DashboardPage() {
         }
       });
 
+      const salesSnap = await getDocs(query(collection(db, "sales"), where("createdAt", ">=", Timestamp.fromDate(start)), where("createdAt", "<=", Timestamp.fromDate(end))));
+      salesSnap.forEach(d => { const sale = d.data(); if (sale.status === "paid") sales += Number(sale.total || 0); });
       const washersArray = Object.values(washerMap);
       let bestName = "---";
       if (washersArray.length > 0) {
@@ -111,7 +115,7 @@ export default function DashboardPage() {
       setStats({
         totalSales: sales,
         totalTips: tips,
-        totalCars: data.length,
+        totalCars: activeData.length,
         pendingCount,
         bestWasherName: bestName,
         washerStats: washersArray,
@@ -158,7 +162,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white/80 backdrop-blur-md p-5 rounded-2xl border-l-4 border-l-espuma-blue shadow-sm">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-            Caja (Pagado)
+            Ventas pagadas hoy
           </h3>
           <div className="mt-2 flex items-center gap-2">
             <DollarSign className="w-8 h-8 text-espuma-blue" />
@@ -207,6 +211,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <p className="text-sm text-gray-600">Las ventas incluyen lavados y productos. Para el saldo real de la jornada y los cobros de pendientes visite <a href="/cash" className="text-cyan-700 underline">Caja</a>.</p>
       {/* EQUIPO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {stats.washerStats.map((w) => (

@@ -24,6 +24,9 @@ import {
   Coins,
   Palette,
 } from "lucide-react";
+import ProductCart from "./ProductCart";
+import { operations, newId } from "@/lib/operations";
+import { CartItem, commission } from "@/lib/operations/model";
 import { Washer } from "@/types";
 import MoneyInput from "./MoneyInput";
 import { enqueueSnackbar } from "notistack";
@@ -43,6 +46,8 @@ interface Client {
 }
 
 export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [requestId, setRequestId] = useState(newId);
   const [loading, setLoading] = useState(false);
   const [washers, setWashers] = useState<Washer[]>([]);
   const [allClients, setAllClients] = useState<Client[]>([]);
@@ -50,7 +55,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   // --- CONFIGURACIÓN GLOBAL ---
-  const [commissionPercent, setCommissionPercent] = useState(35); // Por defecto 35%
+  const [commissionPercent, setCommissionPercent] = useState(40); // Por defecto 35%
 
   // --- ESTADOS DEL FORMULARIO ---
   const [track, setTrack] = useState("0");
@@ -100,7 +105,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           const settingsSnap = await getDoc(doc(db, "settings", "global"));
           if (settingsSnap.exists()) {
             setCommissionPercent(
-              settingsSnap.data()?.defaultCommissionPercentage || 40,
+              settingsSnap.data()?.defaultCommissionPercentage ?? 40,
             );
           }
         } catch (error) {
@@ -111,6 +116,8 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
       initData();
 
       // Resetear formulario
+      setCart([]);
+      setRequestId(newId());
       setClientName("");
       setClientPhone("");
       setVehicleModel("");
@@ -153,57 +160,26 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedWasherId || !vehicleModel) {
-      alert("Faltan datos: Vehículo o Lavador.");
+    if (!selectedWasherId || !vehicleModel || track === "0") {
+      alert("Seleccione vehículo, lavador y pista.");
       return;
     }
-    if (!isPending && price <= 0) {
+    if (!isPending && price <= 0 && cart.length === 0) {
       alert("Por favor ingrese el precio del servicio.");
       return;
     }
 
     setLoading(true);
     try {
-      const washer = washers.find((w) => w.id === selectedWasherId);
+      await operations.saveService({
+        clientName: clientName || "Cliente General", clientPhone: clientPhone || "N/A",
+        vehicle: { model: vehicleModel, color: vehicleColor || "No especificado", bay: track },
+        washerId: selectedWasherId, servicePrice: price,
+        paymentStatus: isPending ? "pending" : "paid", paymentMethod,
+        tipAmount: hasTip ? tipAmount : 0, tipMethod, cart,
+      }, requestId, true);
 
-      // Cálculos Financieros
-      const finalPrice = price;
-      // const finalPrice = isPending ? 0 : price;
-      const finalTip = isPending || !hasTip ? 0 : tipAmount;
-
-      // USAMOS LA COMISIÓN DINÁMICA
-      const rateDecimal = commissionPercent / 100; // Ej: 40 -> 0.40
-      const washerEarnings = finalPrice * rateDecimal;
-      const businessEarnings = finalPrice - washerEarnings;
-
-      const paymentStatus = isPending ? "pending" : "paid";
-
-      await addDoc(collection(db, "services"), {
-        createdAt: Timestamp.now(),
-        clientName: clientName || "Cliente General",
-        clientPhone: clientPhone || "N/A",
-        vehicle: {
-          model: vehicleModel,
-          color: vehicleColor || "No especificado",
-          bay: track || "N/A",
-        },
-
-        financials: {
-          totalPrice: finalPrice,
-          paymentMethod: isPending ? "Pendiente" : paymentMethod,
-          tipAmount: finalTip,
-          tipMethod: isPending || !hasTip ? null : tipMethod,
-          washerEarnings,
-          businessEarnings,
-          commissionRate: rateDecimal, // Guardamos el % usado en este servicio
-        },
-
-        paymentStatus,
-        washerId: selectedWasherId,
-        washerName: washer?.name || "Desconocido",
-        status: "completed",
-      });
-
+      try {
       if (clientName) {
         const existingClient = allClients.find(
           (c) => c.name.toLowerCase() === clientName.toLowerCase(),
@@ -223,11 +199,15 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           await addDoc(collection(db, "clients"), clientData);
         }
       }
+      } catch (clientError) {
+        console.error(clientError);
+        enqueueSnackbar("Servicio guardado; no se pudo actualizar la ficha del cliente.", { variant: "warning" });
+      }
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
-      enqueueSnackbar("Error al guardar el servicio. Intente nuevamente.", { variant: "error" });
+      enqueueSnackbar(error instanceof Error ? error.message : "Error al guardar el servicio.", { variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -421,8 +401,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
               <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
               <p className="text-red-800 font-bold">Servicio por Pagar</p>
               <p className="text-red-600 text-xs mt-1">
-                Se guardará en modo de espera. Podrás ingresar el monto y el cobro cuando
-                el cliente retire el vehículo. Tambien puedes dejar el monto preescrito ingresandolo en modo cobrar ahora y luego regresar a cambiar el estado a pendiente.
+                Puede indicar el precio previsto del lavado y agregar productos. Al guardar, se reservan las unidades; el cobro se registra cuando el cliente pague.
               </p>
             </div>
           ) : (
@@ -501,6 +480,10 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
             </div>
           )}
 
+          <ProductCart value={cart} onChange={setCart} servicePrice={price} tipAmount={!isPending && hasTip ? tipAmount : 0} />
+          <p className="text-sm font-bold text-gray-600">Comisión del lavado: {(commission(washers.find(w => w.id === selectedWasherId)?.commissionPercentage, commissionPercent) * 100).toFixed(2)}%</p>
+          {isPending && <MoneyInput label="Precio previsto del lavado (opcional)" value={price} onChange={setPrice} />}
+          <p className="text-xs text-gray-500">Para cobrar se requiere una caja abierta. Los productos pendientes se reservan al guardar. El total de productos se suma al precio del lavado.</p>
           {/* BOTÓN GUARDAR */}
           <button
             type="submit"

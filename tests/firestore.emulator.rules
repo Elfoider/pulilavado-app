@@ -1,0 +1,4 @@
+// Test fixture exclusively for the local demo-pulilavado emulator.
+// Never deploy these rules to a real project. Production rules are not supplied.
+rules_version = '2';
+service cloud.firestore { match /databases/{database}/documents { match /{path=**} { allow read, write: if true; } } }

@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/.test-build/
+/playwright-report/
+/test-results/
+!.env.example
+
+firestore-debug.log
+firebase-debug.log
+ui-debug.log

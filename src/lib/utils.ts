@@ -2,12 +2,11 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import {
   LayoutDashboard,
-  PlusCircle,
   Users,
   BarChart3,
   Settings,
   Heart,
-  History
+  History, Package, ShoppingCart, Wallet
 } from "lucide-react";
 
 export const menuItems = [
@@ -17,6 +16,9 @@ export const menuItems = [
   { name: "Personal / Lavadores", href: "/washers", icon: Users },
   { name: "Clientes", href: "/clients", icon: Heart },
   { name: "Reportes y Finanzas", href: "/reports", icon: BarChart3 },
+  { name: "Caja", href: "/cash", icon: Wallet },
+  { name: "Inventario", href: "/inventory", icon: Package },
+  { name: "Venta de productos", href: "/sales", icon: ShoppingCart },
   { name: "Configuración", href: "/settings", icon: Settings },
 ];
 
@@ -40,6 +42,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.2.0 - Sistema de Gestión";
+export const versionSoft = "v1.3.3 - Caja e inventario";
 
 

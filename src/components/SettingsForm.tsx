@@ -17,7 +17,7 @@ export default function SettingsForm() {
         
         if (docSnap.exists()) {
           // Si existe, cargamos el valor. Asumimos que guardamos 40 para 40%
-          setCommissionRate(docSnap.data().defaultCommissionPercentage.toString());
+          setCommissionRate((docSnap.data().defaultCommissionPercentage ?? 40).toString());
         }
       } catch (error) {
         console.error("Error cargando configuración:", error);
@@ -33,7 +33,7 @@ export default function SettingsForm() {
 
     try {
       const percentage = parseFloat(commissionRate);
-      if (percentage < 0 || percentage > 100) {
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
         alert("El porcentaje debe estar entre 0 y 100");
         setLoading(false);
         return;
@@ -43,7 +43,7 @@ export default function SettingsForm() {
       await setDoc(doc(db, "settings", "global"), {
         defaultCommissionPercentage: percentage,
         updatedAt: new Date()
-      });
+      }, { merge: true });
 
       alert("Configuración guardada correctamente.");
     } catch (error) {
@@ -75,7 +75,7 @@ export default function SettingsForm() {
             <span className="ml-2 text-gray-500 font-bold">%</span>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Este porcentaje se aplicará a los lavadores en los nuevos servicios registrados.
+            Este porcentaje se aplica a nuevos servicios de lavadores sin comisión individual. No modifica servicios anteriores.
           </p>
         </div>
 

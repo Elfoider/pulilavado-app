@@ -27,7 +27,6 @@ export default function DatabaseFixer() {
         const rootPayment = data.paymentMethod;
         
         // Verificamos el campo dentro de financials
-        const financialPayment = data.financials?.paymentMethod;
 
         // LÓGICA DE CORRECCIÓN:
         // Si existe un pago en la raíz, ese es el que manda (ej: Yappy).
@@ -62,7 +61,7 @@ export default function DatabaseFixer() {
     <div className="p-4 bg-orange-100 border border-orange-300 rounded-xl my-4">
       <h3 className="font-bold text-orange-800">⚠️ Herramienta de Reparación DB</h3>
       <p className="text-sm text-orange-700 mb-2">
-        Esto moverá el "Método de Pago" desde la raíz hacia dentro de <i>financials</i>.
+        Esto moverá el &quot;Método de Pago&quot; desde la raíz hacia dentro de <i>financials</i>.
       </p>
       <div className="flex gap-4 items-center">
         <button 

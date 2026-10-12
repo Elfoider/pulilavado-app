@@ -1,3 +1,4 @@
+import Image from "next/image";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -25,10 +26,12 @@ export default function RootLayout({
           <div className="fixed inset-0 z-[-1] flex items-start justify-center pointer-events-none overflow-hidden bg-gray-50">
             {/* El bg-gray-50 es para que el fondo no sea blanco puro chillón */}
 
-            <img
+            <Image
+              width={700}
+              height={700}
               src="/mrespumafondo.png"
               alt="Fondo Mr. Espuma"
-              className="w-[500px] md:w-[700px] opacity-10"
+              className="w-[500px] md:w-[700px] h-auto opacity-10"
             />
             {/* NOTAS: 
              - opacity-10: Hace que se vea muy suave (10% visible).

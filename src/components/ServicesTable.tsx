@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { ServiceDocument } from "@/types";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal"; // Asegúrate de tener este componente
-import { User, Car, DollarSign } from "lucide-react";
+import { User, Car } from "lucide-react";
 
 interface ServiceWithId extends ServiceDocument {
   id: string;
@@ -29,12 +29,13 @@ export default function DashboardPage() {
   const [selectedService, setSelectedService] = useState<ServiceWithId | null>(
     null,
   );
-  const [washerDailyStats, setWasherDailyStats] = useState<any[]>([]);
+  const [washerDailyStats, setWasherDailyStats] = useState<{ name: string; count: number; total: number; tips: number }[]>([]);
 
   const calculateDailyStats = (services: ServiceWithId[]) => {
     let earnings = 0;
     let tips = 0;
     services.forEach((svc) => {
+      if (svc.paymentStatus === "pending") return;
       earnings += svc.financials.totalPrice;
       tips += svc.financials.tipAmount || 0;
     });
@@ -49,8 +50,8 @@ export default function DashboardPage() {
       // ¿Lo que generó para el local? ¿O su comisión?
       // Usualmente en dashboard principal se muestra Venta Total o Comisión.
       // Pondré Comisión ganada por él hoy.
-      const money = svc.financials.washerEarnings;
-      const tipMoney = svc.financials.tipAmount || 0;
+      const money = svc.paymentStatus === "pending" ? 0 : svc.financials.washerEarnings;
+      const tipMoney = svc.paymentStatus === "pending" ? 0 : svc.financials.tipAmount || 0;
 
       if (!washerMap[name]) washerMap[name] = { name, count: 0, total: 0, tips: 0 };
       washerMap[name].count += 1;
@@ -98,8 +99,9 @@ export default function DashboardPage() {
       const data = snapshot.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() }) as ServiceWithId,
       );
-      setTodayServices(data);
-      calculateDailyStats(data);
+      const activeData = data.filter(s => s.status !== "cancelled");
+      setTodayServices(activeData);
+      calculateDailyStats(activeData);
     });
 
     return () => unsubscribe();
