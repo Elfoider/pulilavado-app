@@ -36,6 +36,7 @@ export interface CashSession {
   tipsByMethod?: Record<Method, number>;
   cashCountExcludesTips?: boolean;
   expectedCash?: number;
+  movementSequence?: number;
   receipts: number;
   tips: number;
   expenses: number;
@@ -46,6 +47,12 @@ export interface CashSession {
   notes?: string;
 }
 export interface CashMovement {
+  sequence?: number;
+  balanceBefore?: number;
+  balanceAfter?: number;
+  cashBefore?: number;
+  cashAfter?: number;
+  businessEffect?: number;
   id: string;
   sessionId: string;
   kind: string;
@@ -53,7 +60,7 @@ export interface CashMovement {
   method: Method;
   referenceId: string;
   description: string;
-  createdAt?: { seconds: number };
+  createdAt?: { seconds: number; nanoseconds?: number };
 }
 export type Data = Record<string, unknown>;
 export interface AtomicTx {

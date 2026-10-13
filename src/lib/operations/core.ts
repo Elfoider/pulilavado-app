@@ -60,11 +60,14 @@ export function createOperations(
   ) {
     const balances = { ...session.balances };
     const tipsByMethod = { ...session.tipsByMethod! };
+    let sequence = session.movementSequence ?? 0;
     let receipts = session.receipts || 0,
       tips = session.tips || 0,
       expenses = session.expenses || 0;
     for (const e of entries) {
       if (!e.amount) continue;
+      const balanceBefore = money(balances[e.method] - tipsByMethod[e.method]);
+      const cashBefore = money(balances.Efectivo - tipsByMethod.Efectivo);
       balances[e.method] = money((balances[e.method] || 0) + e.amount);
       receipts = money(receipts + (e.receipts || 0));
       tips = money(tips + (e.tips || 0));
@@ -72,6 +75,12 @@ export function createOperations(
       expenses = money(expenses + (e.expenses || 0));
       tx.set(`cashMovements/${id()}`, {
         ...e,
+        sequence: ++sequence,
+        businessEffect: money(e.amount - (e.tips || 0)),
+        balanceBefore,
+        balanceAfter: money(balances[e.method] - tipsByMethod[e.method]),
+        cashBefore,
+        cashAfter: money(balances.Efectivo - tipsByMethod.Efectivo),
         sessionId: session.id,
         createdAt: stamp(),
       });
@@ -82,7 +91,7 @@ export function createOperations(
       );
     tx.set(
       `cashSessions/${session.id}`,
-      { balances, tipsByMethod, receipts, tips, expenses, updatedAt: stamp() },
+      { balances, tipsByMethod, receipts, tips, expenses, movementSequence: sequence, updatedAt: stamp() },
       true,
     );
   }
@@ -249,6 +258,7 @@ export function createOperations(
           receipts: 0,
           tips: 0,
           tipsByMethod: emptyBalances(),
+          movementSequence: 1,
           expenses: 0,
           openedAt: stamp(),
         });
@@ -256,6 +266,12 @@ export function createOperations(
         tx.set(`cashMovements/${id()}`, {
           sessionId: requestId,
           kind: "opening",
+          sequence: 1,
+          balanceBefore: 0,
+          balanceAfter: opening,
+          cashBefore: 0,
+          cashAfter: opening,
+          businessEffect: opening,
           amount: opening,
           method: "Efectivo",
           referenceId: requestId,
@@ -312,6 +328,12 @@ export function createOperations(
         tx.set(`cashMovements/${requestId}`, {
           sessionId: session.id,
           amount: signed,
+          sequence: (session.movementSequence ?? 0) + 1,
+          businessEffect: signed,
+          balanceBefore: cashBusinessBalances(session)[pm],
+          balanceAfter: money(cashBusinessBalances(session)[pm] + signed),
+          cashBefore: cashBusinessBalances(session).Efectivo,
+          cashAfter: money(cashBusinessBalances(session).Efectivo + (pm === "Efectivo" ? signed : 0)),
           method: pm,
           kind,
           description: description.trim(),
@@ -325,6 +347,8 @@ export function createOperations(
               ...session.balances,
               [pm]: money(session.balances[pm] + signed),
             },
+            tipsByMethod: session.tipsByMethod,
+            movementSequence: (session.movementSequence ?? 0) + 1,
             expenses: money(
               session.expenses + (kind === "expense" ? amount : 0),
             ),

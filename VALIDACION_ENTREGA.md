@@ -1,4 +1,4 @@
-# Validación de Pulilavado 1.3.5
+# Validación de Pulilavado 1.3.6
 
 Base del código: repositorio Elfoider/pulilavado-app, rama master, commit 345ef6f5c6e316e8ae0b743b92c1f2f1f28a05b0.
 
@@ -50,3 +50,9 @@ Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuraci
 43 pruebas de dominio/renderizado aprobadas y lint sin errores. Se verifica exclusión de propinas en efectivo, separación de propinas digitales, correcciones y anulaciones, disponibilidad para retiros, cierre con diferencia cero y preparación de una sesión anterior desde su ledger. Los cierres ya guardados conservan su criterio original. No se modificaron dependencias salvo el número de versión raíz de la aplicación.
 
 Para 1.3.5 también aprobaron TypeScript/build y la integración con Firestore en emulador real, incluida preparación de una caja anterior concurrente con un ingreso y cierre sin propinas. No se ejecutaron cambios contra los datos de mrespumasystem.
+
+## Movimientos detallados 1.3.6
+
+46 pruebas aprobadas. Las nuevas verifican saldos antes/después en apertura, cobro, propina, gasto, venta digital y devolución; continuidad de saldos y secuencia bajo concurrencia; reintentos sin duplicar; renderizado de columnas, referencias y ausencia de valores inventados en movimientos antiguos. Lint y compilación de producción aprobados. Se mantiene la exclusión de propinas del arqueo.
+
+La integración SDK con Firestore en emulador también aprobó: los movimientos reales guardan los cuatro saldos, su delta coincide con businessEffect y las propinas/medios digitales no modifican efectivo. No se realizaron escrituras en Firebase productivo.

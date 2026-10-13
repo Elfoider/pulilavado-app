@@ -412,7 +412,8 @@ function CashMovements({ sessionId }: { sessionId: string }) {
     [more, setMore] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  async function load() {
+  async function load(reset = false) {
+    if (busy) return;
     setBusy(true);
     try {
       const base = [
@@ -424,11 +425,11 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         query(
           collection(db, "cashMovements"),
           ...base,
-          ...(cursor ? [startAfter(cursor)] : []),
+          ...(!reset && cursor ? [startAfter(cursor)] : []),
         ),
       );
       setRows((prev) => [
-        ...prev,
+        ...(reset ? [] : prev),
         ...snap.docs.map((d) => ({ ...d.data(), id: d.id }) as CashMovement),
       ]);
       setCursor(snap.docs.at(-1));
@@ -442,6 +443,13 @@ function CashMovements({ sessionId }: { sessionId: string }) {
       setBusy(false);
     }
   }
+  const sortedRows = [...rows].sort((a, b) => {
+    const seconds = (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
+    if (seconds) return seconds;
+    const nanos = (b.createdAt?.nanoseconds ?? 0) - (a.createdAt?.nanoseconds ?? 0);
+    return nanos || ((b.sequence ?? 0) - (a.sequence ?? 0));
+  });
+  const recordedAmount = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(2)}` : "No registrado";
   const kinds: Record<string, string> = {
     opening: "Apertura",
     expense: "Gasto",
@@ -458,7 +466,8 @@ function CashMovements({ sessionId }: { sessionId: string }) {
   };
   return (
     <section className="bg-white border rounded-2xl p-5">
-      <h2 className="text-xl font-bold mb-3">Movimientos de esta caja</h2>
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-3"><h2 className="text-xl font-bold">Movimientos de esta caja</h2><button disabled={busy} onClick={() => void load(true)} className="text-cyan-700 disabled:opacity-50">Actualizar movimientos</button></div>
+      <p className="text-sm text-gray-600 mb-3">Saldos del negocio sin propinas. «Saldo del método» corresponde al medio de pago del movimiento; «Efectivo de caja» muestra el dinero esperado en efectivo.</p>
       {error && (
         <p role="alert" className="text-red-700">
           {error}
@@ -468,7 +477,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         <table className="w-full text-sm text-left">
           <thead>
             <tr>
-              {["Fecha", "Tipo", "Método", "Monto", "Detalle / referencia"].map(
+              {["Fecha", "Tipo", "Método", "Monto", "Saldo del método antes", "Saldo del método después", "Efectivo de caja antes", "Efectivo de caja después", "Detalle / referencia"].map(
                 (h) => (
                   <th key={h} className="p-3">
                     {h}
@@ -478,7 +487,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((m) => (
+            {sortedRows.map((m) => (
               <tr key={m.id} className="border-t">
                 <td className="p-3">
                   {m.createdAt
@@ -487,11 +496,16 @@ function CashMovements({ sessionId }: { sessionId: string }) {
                 </td>
                 <td className="p-3">{kinds[m.kind] ?? m.kind}</td>
                 <td className="p-3">{m.method}</td>
-                <td className="p-3 font-bold">${m.amount.toFixed(2)}</td>
+                <td className="p-3 font-bold whitespace-nowrap">{recordedAmount(m.amount)}{String(m.kind).endsWith("_tip") && <p className="font-normal text-xs text-gray-500">Propina · no afecta caja</p>}</td>
+                <td className="p-3 whitespace-nowrap">{recordedAmount(m.balanceBefore)}</td>
+                <td className="p-3 whitespace-nowrap">{recordedAmount(m.balanceAfter)}</td>
+                <td className="p-3 whitespace-nowrap">{recordedAmount(m.cashBefore)}</td>
+                <td className="p-3 whitespace-nowrap">{recordedAmount(m.cashAfter)}</td>
                 <td className="p-3">
                   {m.description}
                   <p className="text-xs text-gray-400 break-all">
-                    {m.referenceId}
+                    Referencia: {m.referenceId}
+                    {m.sequence !== undefined && <> · Movimiento #{m.sequence}</>}
                   </p>
                 </td>
               </tr>
@@ -513,8 +527,9 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         </button>
       )}
       <p className="text-xs text-gray-500 mt-2">
-        Los movimientos se cargan en grupos de 100. Vuelva a seleccionar la caja
-        para actualizar el detalle.
+        Los movimientos se cargan en grupos de 100. Los anteriores a esta versión
+        pueden mostrar «No registrado»: sus saldos históricos no se inventan.
+        Use «Actualizar movimientos» para consultar las operaciones recientes.
       </p>
     </section>
   );

@@ -624,3 +624,26 @@ test("existing open sessions derive exact tip methods from ledger without changi
   await f.api.closeCash("c",30,"");assert.equal(f.get("cashSessions/c").difference,0);
   const closed=structuredClone(f.get("cashSessions/c"));await assert.rejects(f.api.prepareCashSession("c"));assert.deepEqual(f.get("cashSessions/c"),closed);
 });
+
+test("each cash movement stores method and cash before/after atomically, excluding tips", async () => {
+  const f=fixture();await f.api.openCash(10,"c");
+  await f.api.saveService(f.input({tipAmount:3,tipMethod:"Efectivo"}),"s",true);
+  await f.api.cashMove(5,"Efectivo","expense","Insumos","g");
+  await f.api.sell([{productId:"p1",quantity:1}],"Yappy","v");
+  const rows=f.movements("cashMovements");
+  assert.deepEqual(rows.map(m=>[m.sequence,m.balanceBefore,m.balanceAfter,m.cashBefore,m.cashAfter,m.businessEffect]),[
+    [1,0,10,0,10,10],[2,10,30,10,30,20],[3,30,30,30,30,0],[4,30,25,30,25,-5],[5,0,2,25,25,2],
+  ]);
+  await f.api.cashMove(5,"Efectivo","expense","Insumos","g");
+  assert.equal(f.movements("cashMovements").length,5);
+  assert.equal(f.get("cashSessions/c").movementSequence,5);
+});
+test("concurrent movements preserve a single balance chain and reversal snapshots", async () => {
+  const f=fixture();await f.api.openCash(10,"c");
+  await Promise.all([f.api.cashMove(2,"Efectivo","income","A","a"),f.api.cashMove(3,"Efectivo","income","B","b")]);
+  await f.api.sell([{productId:"p1",quantity:1}],"Efectivo","s");
+  await f.api.cancelSale("s","Error");
+  const rows=f.movements("cashMovements");
+  for(let i=1;i<rows.length;i++){assert.equal(rows[i].cashBefore,rows[i-1].cashAfter);assert.equal(rows[i].sequence,rows[i-1].sequence+1);}
+  const refund=rows.at(-1);assert.equal(refund.cashBefore,17);assert.equal(refund.cashAfter,15);assert.equal(refund.businessEffect,-2);
+});
