@@ -66,7 +66,6 @@ test("incompatible closed history warns while a compatible session still renders
       status: "open",
       openingAmount: 10,
       receipts: 24,
-      tipsByMethod: { Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 },
       tips: 0,
       expenses: 0,
       balances: { Efectivo: 34, Yappy: 0, Tarjeta: 0, Transferencia: 0 },
@@ -90,11 +89,4 @@ test("closed historical schema allows new opening without displaying the yellow 
   assert.match(html, /Abrir jornada/);
   assert.doesNotMatch(html, /Caja anterior|Sin arqueo registrado|bg-amber-50/);
   assert.doesNotMatch(html, /Cerrar caja anterior|Estado de caja desconocido/);
-});
-
-
-test("cash screen excludes cash and digital tips while preserving the old closure calculation", () => {
-  const cash={id:"c",status:"open",openingAmount:10,receipts:20,tips:7,expenses:0,balances:{Efectivo:33,Yappy:4,Tarjeta:0,Transferencia:0},tipsByMethod:{Efectivo:3,Yappy:4,Tarjeta:0,Transferencia:0}};
-  const html=renderCash([cash]);assert.match(html,/\$30\.00/);assert.doesNotMatch(html,/\$33\.00/);assert.match(html,/sin propinas/);
-  const old=renderCash([{...cash,status:"closed",countedAmount:33,difference:0}]);assert.match(old,/\$33\.00/);assert.match(old,/cálculo original/);
 });

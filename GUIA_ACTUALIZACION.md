@@ -68,7 +68,7 @@ Al añadir productos a un pendiente, se descuentan inmediatamente del stock disp
 
 Solo hay una caja abierta en esta versión del sistema. Puede abarcar más de un día si no la cierra; el historial es por sesión, no por medianoche.
 
-Efectivo esperado = fondo inicial + entradas efectivas − salidas efectivas. Yappy, Tarjeta y Transferencia se muestran por separado y no se suman al efectivo físico. Diferencia = efectivo contado − efectivo esperado. Desde 1.3.5 las propinas se registran por método, pero se excluyen del saldo del negocio y del arqueo. No registre retiros para entregarlas. Para pagar comisiones, registre un retiro con nombre del lavador y motivo. Los gastos reducen el saldo del método seleccionado.
+Efectivo esperado = fondo inicial + entradas efectivas − salidas efectivas. Yappy, Tarjeta y Transferencia se muestran por separado y no se suman al efectivo físico. Diferencia = efectivo contado − efectivo esperado. Las propinas entran en el método recibido, separadas de las ventas. Para entregar propinas o comisiones, registre un retiro con nombre del lavador y motivo; no se descuentan automáticamente. Los gastos reducen el saldo del método seleccionado.
 
 Anular un pago en efectivo requiere efectivo disponible para devolverlo. Las correcciones y anulaciones financieras solo se admiten mientras la caja original permanece abierta. Después del cierre se permite corregir datos de contacto/vehículo, pero no importes, método, lavador ni distribución de productos. Esta entrega no incluye reaperturas ni reembolsos de cajas anteriores.
 

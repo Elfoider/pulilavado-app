@@ -1,6 +1,6 @@
 # Sistema Pulilavado / Mr. Espuma
 
-Actualización 1.3.5 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
+Actualización 1.3.4 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
 
 Lea [GUIA_ACTUALIZACION.md](GUIA_ACTUALIZACION.md) para instalación, configuración de Firebase, reglas operativas, tratamiento de datos históricos y pruebas.
 
@@ -17,5 +17,3 @@ Firebase conserva el proyecto original `mrespumasystem`. No se modifica producci
 La corrección de Caja y los pasos para aplicar esta versión se describen en [CORRECCION_CAJA.md](CORRECCION_CAJA.md).
 
 En Reportes y Finanzas puede seleccionar qué lavadores incluir en el PDF de nómina. El total del PDF corresponde solo a la selección.
-
-Arqueo sin propinas: vea [CORRECCION_PROPINAS.md](CORRECCION_PROPINAS.md).

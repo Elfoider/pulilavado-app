@@ -1,4 +1,4 @@
-# Validación de Pulilavado 1.3.5
+# Validación de Pulilavado 1.3.4
 
 Base del código: repositorio Elfoider/pulilavado-app, rama master, commit 345ef6f5c6e316e8ae0b743b92c1f2f1f28a05b0.
 
@@ -44,9 +44,3 @@ Con esa instalación limpia también aprobaron las 36 pruebas, ESLint y la compi
 39 pruebas aprobadas. Las tres nuevas ejecutan la carga, selección y exportación del componente con datos Firebase y PDF simulados. Comprueban selección por identificador con nombres iguales, suma de varios servicios de un mismo lavador, exclusión de pendientes/anulados, persistencia al actualizar, total y filas del PDF, seleccionar todos/quitar selección y bloqueo ante lista vacía, error o cambio de período. Las fechas de los controles se generan en hora local, sin desplazarlas al convertir a UTC. No se modificaron las versiones de dependencias.
 
 Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuración TLS descrita anteriormente). La instalación con caché vacía se validó al corregir 1.3.3; 1.3.4 conserva exactamente las dependencias de esa corrección.
-
-## Arqueo sin propinas 1.3.5
-
-43 pruebas de dominio/renderizado aprobadas y lint sin errores. Se verifica exclusión de propinas en efectivo, separación de propinas digitales, correcciones y anulaciones, disponibilidad para retiros, cierre con diferencia cero y preparación de una sesión anterior desde su ledger. Los cierres ya guardados conservan su criterio original. No se modificaron dependencias salvo el número de versión raíz de la aplicación.
-
-Para 1.3.5 también aprobaron TypeScript/build y la integración con Firestore en emulador real, incluida preparación de una caja anterior concurrente con un ingreso y cierre sin propinas. No se ejecutaron cambios contra los datos de mrespumasystem.

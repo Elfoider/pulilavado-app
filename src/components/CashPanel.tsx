@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { enqueueSnackbar } from "notistack";
 import { useCollection } from "@/lib/useCollection";
@@ -10,7 +10,6 @@ import {
   METHODS,
   isCashSession,
   cashSessionProblem,
-  cashBusinessBalances,
   isLegacyCashSession,
 } from "@/lib/operations/model";
 import { newId, operations } from "@/lib/operations";
@@ -55,22 +54,8 @@ export default function CashPanel() {
   const open = sessions.find((s) => s.status === "open");
   const session =
     sessions.find((s) => s.id === selectedId) ?? open ?? sessions[0];
-  const [tipError, setTipError] = useState("");
-  useEffect(() => {
-    if (!open || open.tipsByMethod) return;
-    let active = true;
-    operations.prepareCashSession(open.id).catch((error: unknown) => {
-      if (active) setTipError(error instanceof Error ? error.message : "No se pudieron separar las propinas.");
-    });
-    return () => { active = false; };
-  }, [open]);
-  const cashReady = !!session && (session.status === "closed" && !session.cashCountExcludesTips || !!session.tipsByMethod);
-  const displayBalances = cashReady && session
-    ? (session.status === "closed" && !session.cashCountExcludesTips ? session.balances : cashBusinessBalances(session))
-    : null;
-
   async function run(work: () => Promise<unknown>, legacyClosing = false) {
-    if (busy || (blocked && !legacyClosing) || (!legacyClosing && open && !open.tipsByMethod)) return;
+    if (busy || (blocked && !legacyClosing)) return;
     setBusy(true);
     try {
       await work();
@@ -101,7 +86,6 @@ export default function CashPanel() {
           {error}
         </p>
       )}
-      {open && !open.tipsByMethod && <p role="status" className="text-sm text-gray-600">{tipError || "Separando las propinas de la caja…"}</p>}
       {legacy.filter((s) => s.isOpen === true).map((s) => (
         <section key={s.id} className="border border-amber-300 bg-amber-50 rounded-xl p-4 space-y-3">
           <h2 className="font-bold">Caja anterior · Abierta</h2>
@@ -188,7 +172,7 @@ export default function CashPanel() {
           </button>
         </form>
       )}
-      {open && !!open.tipsByMethod && !blocked && (
+      {open && !blocked && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -296,7 +280,7 @@ export default function CashPanel() {
         Las 100 cajas más recientes. Los cobros anteriores a esta actualización
         permanecen en Historial y Reportes.
       </p>
-      {session && displayBalances && (
+      {session && (
         <>
           <section className="bg-white border rounded-2xl p-5 space-y-4">
             <div className="flex justify-between">
@@ -314,7 +298,7 @@ export default function CashPanel() {
                     {m === "Efectivo" ? "Efectivo esperado" : m}
                   </p>
                   <p className="text-2xl font-black">
-                    ${displayBalances[m].toFixed(2)}
+                    ${(session.balances[m] || 0).toFixed(2)}
                   </p>
                 </div>
               ))}
@@ -335,9 +319,10 @@ export default function CashPanel() {
               </p>
             </div>
             <p className="text-xs text-gray-500">
-              {session.status === "closed" && !session.cashCountExcludesTips
-                ? "Este cierre anterior conserva el cálculo original, que incluía las propinas."
-                : "Las propinas están fuera de los saldos del negocio y del arqueo. Cuente únicamente el efectivo del negocio, sin propinas. No registre un retiro de caja para entregar estas propinas. Las comisiones sí se registran como retiro al pagarlas."}
+              Las propinas se incluyen en el saldo del método recibido y se
+              muestran separadas de las ventas. Para entregarlas al lavador
+              registre un retiro con su nombre. La comisión se registra en el
+              servicio; solo afecta el efectivo al pagarla como retiro.
             </p>
             {session.status === "closed" && (
               <div className="border-t pt-4">
@@ -382,7 +367,7 @@ export default function CashPanel() {
                 Diferencia:{" "}
                 {counted === ""
                   ? "—"
-                  : `$${(Number(counted) - displayBalances.Efectivo).toFixed(2)}`}
+                  : `$${(Number(counted) - session.balances.Efectivo).toFixed(2)}`}
               </p>
               <textarea
                 aria-label="Observaciones del cierre"

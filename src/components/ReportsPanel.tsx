@@ -231,7 +231,7 @@ export default function ReportsPage() {
       setIncomeByMethod(tempIncomeMethod);
       setTipsByMethod(tempTipsMethod);
 
-      setNetCashInRegister(tempIncomeMethod["Efectivo"]);
+      setNetCashInRegister(tempIncomeMethod["Efectivo"] + tempTipsMethod["Efectivo"]);
 
       const payrollArray = Object.values(washerMap).sort((a, b) => a.washerName.localeCompare(b.washerName));
       setPayrollList(payrollArray);
@@ -346,7 +346,7 @@ export default function ReportsPage() {
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("(Ventas recibidas en efectivo; sin propinas)", 100, 58);
+    doc.text("(Ventas y propinas recibidas en efectivo)", 100, 58);
 
     // --- SECCIÓN 2: ESTADÍSTICAS ---
     let yPos = 75;
@@ -518,7 +518,7 @@ export default function ReportsPage() {
             </h3>
             <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
               <TrendingUp className="w-3 h-3 rotate-180" />
-              <span>Ventas en efectivo; sin propinas</span>
+              <span>Ventas + propinas en efectivo</span>
             </div>
           </div>
         </div>

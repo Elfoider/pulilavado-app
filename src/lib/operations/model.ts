@@ -33,9 +33,6 @@ export interface CashSession {
   status: "open" | "closed";
   openingAmount: number;
   balances: Record<Method, number>;
-  tipsByMethod?: Record<Method, number>;
-  cashCountExcludesTips?: boolean;
-  expectedCash?: number;
   receipts: number;
   tips: number;
   expenses: number;
@@ -59,7 +56,6 @@ export type Data = Record<string, unknown>;
 export interface AtomicTx {
   get(path: string): Promise<Data | undefined>;
   set(path: string, data: Data, merge?: boolean): void;
-  readTipBalances?(sessionId: string): Promise<Record<Method, number>>;
 }
 export type Atomic = <T>(work: (tx: AtomicTx) => Promise<T>) => Promise<T>;
 export function money(n: number) {
@@ -134,12 +130,6 @@ export function cashSessionProblem(value: unknown): string | null {
   }
   if (data.notes != null && typeof data.notes !== "string")
     return "Las observaciones del cierre son inválidas.";
-  if (data.tipsByMethod !== undefined) {
-    if (!data.tipsByMethod || typeof data.tipsByMethod !== "object") return "Desglose de propinas inválido.";
-    const totals = data.tipsByMethod as Record<string, unknown>;
-    for (const m of METHODS) if (typeof totals[m] !== "number" || !Number.isFinite(totals[m])) return "Desglose de propinas incompleto.";
-    if (money(METHODS.reduce((sum, m) => sum + Number(totals[m]), 0)) !== money(Number(data.tips))) return "El desglose de propinas no coincide con su total.";
-  }
   return null;
 }
 export function isCashSession(value: unknown): value is CashSession {
@@ -155,20 +145,4 @@ export function isLegacyCashSession(value: unknown): boolean {
     typeof s.responsible === "string" && typeof s.observations === "string" &&
     !!s.openedAt && s.balances === undefined &&
     (s.status === undefined || (s.status === "closed" && s.isOpen === false));
-}
-
-export function cashBusinessBalances(session: CashSession): Record<Method, number> {
-  if (!session.tipsByMethod) throw new Error("Falta separar las propinas de esta caja.");
-  return Object.fromEntries(METHODS.map(m => [m, money(session.balances[m] - session.tipsByMethod![m])])) as Record<Method, number>;
-}
-
-export function tipBalancesFromMovements(rows: Data[]): Record<Method, number> {
-  const result = emptyBalances();
-  for (const row of rows) {
-    if (!String(row.kind).endsWith("_tip")) continue;
-    if (typeof row.amount !== "number" || !Number.isFinite(row.amount)) throw new Error("Movimiento de propina inválido.");
-    const pm = method(String(row.method));
-    result[pm] = money(result[pm] + row.amount);
-  }
-  return result;
 }
