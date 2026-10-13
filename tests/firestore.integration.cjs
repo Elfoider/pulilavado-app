@@ -9,8 +9,9 @@ const {
   getDoc,
   runTransaction,
   serverTimestamp,
-  getDocs,
+  getDocs, query, where, deleteField,
 } = require("firebase/firestore");
+const { tipBalancesFromMovements } = require("../.test-build/model.js");
 const { createOperations } = require("../.test-build/core.js");
 if (!process.env.FIRESTORE_EMULATOR_HOST)
   throw new Error("These tests require a local Firestore emulator.");
@@ -32,6 +33,10 @@ const ops = createOperations(
         async get(path) {
           const s = await tx.get(doc(db, path));
           return s.exists() ? s.data() : undefined;
+        },
+        async readTipBalances(sessionId) {
+          const rows = await getDocs(query(collection(db, "cashMovements"), where("sessionId", "==", sessionId)));
+          return tipBalancesFromMovements(rows.docs.map(row => row.data()));
         },
         set(path, data, merge = false) {
           tx.set(doc(db, path), clean(data), { merge });
@@ -100,7 +105,13 @@ async function main() {
   assert.equal((await read("cashSessions/c")).receipts, 0);
   assert.equal((await read("cashSessions/c")).balances.Efectivo, 10);
   await ops.sell([{ productId: "p", quantity: 1 }], "Efectivo", "final-sale");
-  await ops.closeCash("c", 12, "Cierre de prueba");
+  await ops.saveService({...input,cart:[],servicePrice:1,paymentStatus:"paid",tipAmount:4,tipMethod:"Efectivo"},"tip-only",true);
+  await setDoc(doc(db,"cashSessions/c"),{tipsByMethod:deleteField()},{merge:true});
+  await Promise.all([ops.prepareCashSession("c"),ops.cashMove(1,"Efectivo","income","Concurrent income","income")]);
+  assert.equal((await read("cashSessions/c")).tipsByMethod.Efectivo,4);
+  assert.equal((await read("cashSessions/c")).balances.Efectivo,18);
+  await ops.closeCash("c", 14, "Cierre sin propinas");
+  assert.equal((await read("cashSessions/c")).expectedCash,14);
   assert.equal((await read("cashSessions/c")).difference, 0);
   await ops.openCash(0, "next-c");
   await assert.rejects(ops.cancelSale("final-sale", "Error"), /cerrada/);

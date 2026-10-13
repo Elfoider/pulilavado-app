@@ -6,6 +6,7 @@ import {
   CartItem,
   CashSession,
   cashSessionProblem,
+  cashBusinessBalances,
   isLegacyCashSession,
   Method,
   money,
@@ -34,7 +35,14 @@ export function createOperations(
       throw new Error(
         `La caja abierta tiene un formato anterior o incompleto: ${problem} Revise ese registro antes de operar.`,
       );
-    return { ...session, id: sessionId } as unknown as CashSession;
+    const result = { ...session, id: sessionId } as unknown as CashSession;
+    if (!result.tipsByMethod) {
+      if (!tx.readTipBalances) throw new Error("Debe separar las propinas de la caja antes de operar.");
+      result.tipsByMethod = await tx.readTipBalances(result.id);
+      const error = cashSessionProblem(result);
+      if (error) throw new Error(error);
+    }
+    return result;
   }
   function ledger(
     tx: AtomicTx,
@@ -51,6 +59,7 @@ export function createOperations(
     }[],
   ) {
     const balances = { ...session.balances };
+    const tipsByMethod = { ...session.tipsByMethod! };
     let receipts = session.receipts || 0,
       tips = session.tips || 0,
       expenses = session.expenses || 0;
@@ -59,6 +68,7 @@ export function createOperations(
       balances[e.method] = money((balances[e.method] || 0) + e.amount);
       receipts = money(receipts + (e.receipts || 0));
       tips = money(tips + (e.tips || 0));
+      tipsByMethod[e.method] = money(tipsByMethod[e.method] + (e.tips || 0));
       expenses = money(expenses + (e.expenses || 0));
       tx.set(`cashMovements/${id()}`, {
         ...e,
@@ -66,13 +76,13 @@ export function createOperations(
         createdAt: stamp(),
       });
     }
-    if (balances.Efectivo < 0)
+    if (money(balances.Efectivo - tipsByMethod.Efectivo) < 0)
       throw new Error(
         "El efectivo disponible no alcanza para devolver este cobro.",
       );
     tx.set(
       `cashSessions/${session.id}`,
-      { balances, receipts, tips, expenses, updatedAt: stamp() },
+      { balances, tipsByMethod, receipts, tips, expenses, updatedAt: stamp() },
       true,
     );
   }
@@ -181,6 +191,13 @@ export function createOperations(
     ];
   }
   const api = {
+    async prepareCashSession(sessionId: string) {
+      return atomic(async tx => {
+        const session = await openSession(tx);
+        if (session.id !== sessionId) throw new Error("La caja cambió. Actualice la pantalla.");
+        tx.set(`cashSessions/${session.id}`, { tipsByMethod: session.tipsByMethod }, true);
+      });
+    },
     async closeLegacyCash(sessionId: string, counted: number, notes: string) {
       counted = nonnegative(counted, "Efectivo contado");
       if (!notes.trim()) throw new Error("Indique quién revisó la caja y el motivo del cierre anterior.");
@@ -231,6 +248,7 @@ export function createOperations(
           balances: { ...emptyBalances(), Efectivo: opening },
           receipts: 0,
           tips: 0,
+          tipsByMethod: emptyBalances(),
           expenses: 0,
           openedAt: stamp(),
         });
@@ -258,7 +276,10 @@ export function createOperations(
           {
             status: "closed",
             countedAmount: counted,
-            difference: money(counted - session.balances.Efectivo),
+            difference: money(counted - cashBusinessBalances(session).Efectivo),
+            expectedCash: cashBusinessBalances(session).Efectivo,
+            tipsByMethod: session.tipsByMethod,
+            cashCountExcludesTips: true,
             notes,
             closedAt: stamp(),
           },
@@ -283,7 +304,7 @@ export function createOperations(
         if (existing) return;
         const session = await openSession(tx);
         const signed = kind === "income" ? amount : -amount;
-        if (pm === "Efectivo" && session.balances.Efectivo + signed < 0)
+        if (pm === "Efectivo" && cashBusinessBalances(session).Efectivo + signed < 0)
           throw new Error(
             "El efectivo disponible no alcanza para esta salida.",
           );

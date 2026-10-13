@@ -42,6 +42,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.3.4 - Nómina seleccionable";
+export const versionSoft = "v1.3.5 - Arqueo sin propinas";
 
 

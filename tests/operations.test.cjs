@@ -32,6 +32,11 @@ function fixture() {
           );
           return docs.has(path) ? structuredClone(docs.get(path)) : undefined;
         },
+        async readTipBalances(sessionId) {
+          const values = { Efectivo: 0, Yappy: 0, Tarjeta: 0, Transferencia: 0 };
+          for (const [path, row] of docs) if (path.startsWith("cashMovements/") && row.sessionId === sessionId && row.kind.endsWith("_tip")) values[row.method] += row.amount;
+          return values;
+        },
         set(path, value, merge = false) {
           writing = true;
           const clean = Object.fromEntries(
@@ -589,4 +594,33 @@ test("legacy close rejects unknown shapes and modern sessions without changing t
   await f.api.openCash(10, "new");
   await assert.rejects(f.api.closeLegacyCash("new", 10, "Review"));
   assert.equal(f.get("cashSessions/new").status, "open");
+});
+
+
+test("cash tips are recorded separately and excluded from counted difference and available withdrawals", async () => {
+  const f = fixture(); await f.api.openCash(10, "c");
+  await f.api.saveService(f.input({tipAmount: 3,tipMethod: "Efectivo"}),"s",true);
+  assert.equal(f.get("cashSessions/c").balances.Efectivo,33);
+  assert.equal(f.get("cashSessions/c").tipsByMethod.Efectivo,3);
+  await assert.rejects(f.api.cashMove(31,"Efectivo","withdrawal","Excess","m"),/no alcanza/);
+  await f.api.closeCash("c",30,"");
+  const c=f.get("cashSessions/c"); assert.equal(c.expectedCash,30);assert.equal(c.difference,0);assert.equal(c.cashCountExcludesTips,true);
+});
+test("digital tips never reduce expected cash and corrections/refunds keep tip buckets consistent", async () => {
+  const f=fixture(); await f.api.openCash(0,"c");
+  await f.api.saveService(f.input({tipAmount:4,tipMethod:"Yappy"}),"s",true);
+  await f.api.saveService(f.input({tipAmount:2,tipMethod:"Efectivo"}),"s",false);
+  const c=f.get("cashSessions/c");assert.equal(c.tipsByMethod.Yappy,0);assert.equal(c.tipsByMethod.Efectivo,2);
+  const {cashBusinessBalances}=require("../.test-build/model.js");
+  assert.equal(cashBusinessBalances(c).Efectivo,20);assert.equal(cashBusinessBalances(c).Yappy,0);
+  await f.api.cancelService("s","Error");assert.equal(f.get("cashSessions/c").tips,0);assert.equal(f.get("cashSessions/c").tipsByMethod.Efectivo,0);
+});
+test("existing open sessions derive exact tip methods from ledger without changing totals or closed history", async () => {
+  const f=fixture();await f.api.openCash(10,"c");
+  await f.api.saveService(f.input({tipAmount:3,tipMethod:"Efectivo"}),"s",true);
+  const old=structuredClone(f.get("cashSessions/c"));delete old.tipsByMethod;f.docs.set("cashSessions/c",old);
+  await f.api.prepareCashSession("c");
+  assert.equal(f.get("cashSessions/c").balances.Efectivo,33);assert.equal(f.get("cashSessions/c").tipsByMethod.Efectivo,3);
+  await f.api.closeCash("c",30,"");assert.equal(f.get("cashSessions/c").difference,0);
+  const closed=structuredClone(f.get("cashSessions/c"));await assert.rejects(f.api.prepareCashSession("c"));assert.deepEqual(f.get("cashSessions/c"),closed);
 });
