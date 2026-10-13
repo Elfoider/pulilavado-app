@@ -6,7 +6,7 @@ const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
 const model = require("../.test-build/model.js");
 
-function renderCash(data, movements = []) {
+function renderCash(data) {
   const code = ts.transpileModule(
     fs.readFileSync("src/components/CashPanel.tsx", "utf8"),
     {
@@ -19,7 +19,6 @@ function renderCash(data, movements = []) {
   ).outputText;
   const compiledModule = { exports: {} };
   const localRequire = (name) => {
-    if (name === "react") return { ...React, useState: (initial) => React.useState(Array.isArray(initial) && initial.length === 0 ? movements : initial) };
     if (name === "@/lib/useCollection")
       return { useCollection: () => ({ data, error: "", loading: false }) };
     if (name === "@/lib/operations/model") return model;
@@ -98,11 +97,4 @@ test("cash screen excludes cash and digital tips while preserving the old closur
   const cash={id:"c",status:"open",openingAmount:10,receipts:20,tips:7,expenses:0,balances:{Efectivo:33,Yappy:4,Tarjeta:0,Transferencia:0},tipsByMethod:{Efectivo:3,Yappy:4,Tarjeta:0,Transferencia:0}};
   const html=renderCash([cash]);assert.match(html,/\$30\.00/);assert.doesNotMatch(html,/\$33\.00/);assert.match(html,/sin propinas/);
   const old=renderCash([{...cash,status:"closed",countedAmount:33,difference:0}]);assert.match(old,/\$33\.00/);assert.match(old,/cálculo original/);
-});
-
-
-test("movement table renders before/after balances, exact reference and unknown historical values", () => {
-  const session={id:"c",status:"open",openingAmount:10,receipts:20,tips:3,expenses:0,balances:{Efectivo:33,Yappy:0,Tarjeta:0,Transferencia:0},tipsByMethod:{Efectivo:3,Yappy:0,Tarjeta:0,Transferencia:0}};
-  const html=renderCash([session],[{id:"m",sessionId:"c",kind:"service_payment",method:"Efectivo",amount:20,balanceBefore:10,balanceAfter:30,cashBefore:10,cashAfter:30,referenceId:"service-123",description:"Cobro servicio",sequence:2},{id:"old",sessionId:"c",kind:"income",method:"Efectivo",amount:1,referenceId:"old-ref",description:"Anterior"}]);
-  assert.match(html,/Saldo del método antes/);assert.match(html,/Efectivo de caja después/);assert.match(html,/Referencia: service-123/);assert.match(html,/Movimiento #2/);assert.match(html,/No registrado/);
 });

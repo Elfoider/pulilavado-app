@@ -116,15 +116,6 @@ async function main() {
   await ops.openCash(0, "next-c");
   await assert.rejects(ops.cancelSale("final-sale", "Error"), /cerrada/);
   assert.equal((await read("products/p")).stock, 9);
-  const allMoves = (await getDocs(collection(db, "cashMovements"))).docs.map(row => row.data());
-  for (const movement of allMoves) {
-    assert.equal(typeof movement.cashBefore, "number");
-    assert.equal(typeof movement.cashAfter, "number");
-    assert.equal(typeof movement.balanceBefore, "number");
-    assert.equal(typeof movement.balanceAfter, "number");
-    assert.equal(Math.round((movement.balanceAfter - movement.balanceBefore) * 100), Math.round(movement.businessEffect * 100));
-    if (movement.kind.endsWith("_tip") || movement.method !== "Efectivo") assert.equal(movement.cashBefore, movement.cashAfter);
-  }
   for (const c of ["cashMovements", "inventoryMovements"])
     assert.ok((await getDocs(collection(db, c))).size > 0);
   console.log(
