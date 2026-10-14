@@ -1,6 +1,6 @@
 # Sistema Pulilavado / Mr. Espuma
 
-Actualización 1.3.7 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
+Actualización 1.3.8 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
 
 Lea [GUIA_ACTUALIZACION.md](GUIA_ACTUALIZACION.md) para instalación, configuración de Firebase, reglas operativas, tratamiento de datos históricos y pruebas.
 
@@ -19,3 +19,5 @@ La corrección de Caja y los pasos para aplicar esta versión se describen en [C
 En Reportes y Finanzas puede seleccionar qué lavadores incluir en el PDF de nómina. El total del PDF corresponde solo a la selección.
 
 Reportes y Finanzas muestra el efectivo de la caja abierta en tiempo real, incluyendo gastos y retiros registrados. Consulte [CAJA_Y_REPORTES.md](CAJA_Y_REPORTES.md).
+
+La tarjeta «Efectivo neto de la jornada» muestra el saldo de la caja abierta menos su fondo inicial. Los ingresos por método del período conservan sus importes brutos.

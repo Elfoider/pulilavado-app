@@ -72,6 +72,9 @@ export default function ReportsPage() {
   // CAJA REAL
   const cash = useCurrentCash();
   const cashLabel = cash.loading ? "Cargando…" : cash.error ? "No disponible" : cash.session ? formatMoney(cash.session.balances.Efectivo) : "Sin caja abierta";
+  const netCashLabel = cash.session && !cash.loading && !cash.error
+    ? formatMoney(cash.session.balances.Efectivo - cash.session.openingAmount)
+    : cashLabel;
 
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
@@ -357,6 +360,7 @@ export default function ReportsPage() {
     let yPos = 75;
 
     const kpiData = [
+      ["Efectivo neto de la jornada (sin fondo inicial)", netCashLabel],
       ["Ventas servicios y productos", `${formatMoney(serviceSales)}`],
       ["Propinas Totales", `${formatMoney(totalTips)}`],
       ["Ingresos despues de comisiones", `${formatMoney(netBusinessProfit)}`],
@@ -509,7 +513,7 @@ export default function ReportsPage() {
 
       <p className="text-sm text-gray-600">Las ventas y propinas usan la fecha de registro y excluyen pendientes y anulados. El efectivo en caja muestra el saldo actual, independiente del período seleccionado. Para registrar pagos y consultar movimientos visite <a href="/cash" className="underline text-cyan-700">Caja</a>. Registre cada pago de propinas como gasto o retiro en Efectivo para descontarlo del saldo.</p>
       {/* KPI CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 border border-gray-700 relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <Banknote className="w-24 h-24" />
@@ -526,6 +530,17 @@ export default function ReportsPage() {
               <span>Fondo + entradas − gastos y retiros</span>
             </div>
           </div>
+        </div>
+
+        <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm" aria-label="Efectivo neto de la jornada">
+          <p className="text-emerald-700 text-xs font-bold uppercase tracking-wider mb-2">
+            Efectivo neto de la jornada
+          </p>
+          <h3 className="text-3xl font-black text-emerald-900">{netCashLabel}</h3>
+          <p className="text-emerald-700 text-xs mt-2">
+            Entradas menos salidas en efectivo de la caja abierta, sin fondo inicial. Incluye los pagos de propinas registrados.
+          </p>
+          <p className="text-emerald-700 text-xs mt-1">Independiente del filtro de fechas.</p>
         </div>
 
         <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">

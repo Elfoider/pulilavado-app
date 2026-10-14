@@ -146,3 +146,23 @@ test("financial report and PDF follow current cash after a tip payment, independ
   h.button("Control Financiero Interno").props.onClick();
   assert.equal(h.documents.length, 1);
 });
+
+
+test("net cash excludes opening fund and paid tips while period cash sales remain unchanged", async () => {
+  const cash = { session: { balances: { Efectivo: 72 }, openingAmount: 65 }, loading: false, error: "" };
+  const h = harness([service("a", "Ana", 3, { paymentMethod: "Efectivo", financials: { totalPrice: 12, washerEarnings: 3, businessEarnings: 9 } })], cash);
+  await h.refresh();
+  const card = () => h.nodes(h.render()).find(n => n.props?.["aria-label"] === "Efectivo neto de la jornada");
+  assert.match(h.textOf(card()), /\$7\.00/);
+  // The original payment-method card continues reporting gross period income.
+  const gross = h.nodes(h.render()).find(n => typeof n.type === "function" && n.props.title === "Efectivo");
+  assert.equal(gross.props.amount, 12);
+  h.button("Control Financiero Interno").props.onClick();
+  assert.ok(h.documents[0].texts.includes("$72.00"));
+  assert.deepEqual(h.tables[0].body[0], ["Efectivo neto de la jornada (sin fondo inicial)", "$7.00"]);
+  cash.session.balances.Efectivo = 60;
+  assert.match(h.textOf(card()), /\$-5\.00/); // Outflows may use part of the opening fund.
+  assert.equal(gross.props.amount, 12);
+  cash.session = null;
+  assert.match(h.textOf(card()), /Sin caja abierta/);
+});

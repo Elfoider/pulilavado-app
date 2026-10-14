@@ -49,3 +49,8 @@ Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuraci
 ## Actualización 1.3.7 — vínculo entre Caja y Reportes
 
 43 pruebas automatizadas aprobadas; ESLint y compilación de producción aprobados. El caso de efectivo $12 menos pago de propinas $5 arroja $7, tanto en la suscripción de caja como en la pantalla y PDF financiero. También se verifican reintentos sin doble descuento, cambios/cierre de sesión y errores de lectura. No se ejecutaron escrituras en Firebase de producción.
+
+
+## Actualización 1.3.8 — efectivo neto sin fondo inicial
+
+44 pruebas automatizadas aprobadas, ESLint y build de producción aprobados. Nuevo caso: apertura $65, saldo total $72 y ventas en efectivo del período $12; la tarjeta neta y la fila del PDF muestran $7 y el desglose original mantiene $12. Se verifica también que una salida que utiliza el fondo puede dejar efectivo neto negativo.
