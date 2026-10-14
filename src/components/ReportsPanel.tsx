@@ -23,6 +23,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
+import { useCurrentCash } from "@/lib/useCurrentCash";
 
 const dateInputValue = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -69,7 +70,8 @@ export default function ReportsPage() {
   });
 
   // CAJA REAL
-  const [netCashInRegister, setNetCashInRegister] = useState(0);
+  const cash = useCurrentCash();
+  const cashLabel = cash.loading ? "Cargando…" : cash.error ? "No disponible" : cash.session ? formatMoney(cash.session.balances.Efectivo) : "Sin caja abierta";
 
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
@@ -231,7 +233,6 @@ export default function ReportsPage() {
       setIncomeByMethod(tempIncomeMethod);
       setTipsByMethod(tempTipsMethod);
 
-      setNetCashInRegister(tempIncomeMethod["Efectivo"] + tempTipsMethod["Efectivo"]);
 
       const payrollArray = Object.values(washerMap).sort((a, b) => a.washerName.localeCompare(b.washerName));
       setPayrollList(payrollArray);
@@ -315,6 +316,10 @@ export default function ReportsPage() {
   // 2. GENERAR PDF FINANCIERO (GERENCIAL)
   // ==========================================
   const generateFinancialPDF = () => {
+    if (!reportReady || cash.loading || cash.error) {
+      enqueueSnackbar("Espere a que se carguen el reporte y el saldo de Caja.", { variant: "warning" });
+      return;
+    }
     const doc = new jsPDF();
     const todayStr = new Date().toLocaleDateString();
 
@@ -339,14 +344,14 @@ export default function ReportsPage() {
 
     doc.setFontSize(14);
     doc.setTextColor(0);
-    doc.text("COBROS EN EFECTIVO DEL PERIODO", 20, 50);
+    doc.text("EFECTIVO EN CAJA ACTUAL", 20, 50);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(`${formatMoney(netCashInRegister)}`, 20, 58);
+    doc.text(cashLabel, 20, 58);
 
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text("(Ventas y propinas recibidas en efectivo)", 100, 58);
+    doc.text("Saldo actual, independiente del periodo", 100, 58);
 
     // --- SECCIÓN 2: ESTADÍSTICAS ---
     let yPos = 75;
@@ -502,7 +507,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-600">Este reporte usa la fecha de registro del servicio o venta y excluye pendientes y anulados. Para cobros por fecha de pago, fondo inicial, gastos, retiros y arqueo consulte <a href="/cash" className="underline text-cyan-700">Caja</a>. Las propinas digitales no descuentan efectivo automáticamente.</p>
+      <p className="text-sm text-gray-600">Las ventas y propinas usan la fecha de registro y excluyen pendientes y anulados. El efectivo en caja muestra el saldo actual, independiente del período seleccionado. Para registrar pagos y consultar movimientos visite <a href="/cash" className="underline text-cyan-700">Caja</a>. Registre cada pago de propinas como gasto o retiro en Efectivo para descontarlo del saldo.</p>
       {/* KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 border border-gray-700 relative overflow-hidden">
@@ -511,14 +516,14 @@ export default function ReportsPage() {
           </div>
           <div className="relative z-10">
             <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">
-              Cobros en efectivo
+              Efectivo en caja actual
             </p>
             <h3 className="text-4xl font-black tracking-tight">
-              {formatMoney(netCashInRegister)}
+              {cashLabel}
             </h3>
             <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
               <TrendingUp className="w-3 h-3 rotate-180" />
-              <span>Ventas + propinas en efectivo</span>
+              <span>Fondo + entradas − gastos y retiros</span>
             </div>
           </div>
         </div>
@@ -612,7 +617,7 @@ export default function ReportsPage() {
                   Yappy
                 </p>
                 <p className="text-[10px] text-blue-500">
-                  Se resta del efectivo de caja
+                  El pago en efectivo se registra en Caja
                 </p>
               </div>
               <p className="text-lg font-black text-blue-800">
@@ -625,7 +630,7 @@ export default function ReportsPage() {
                   Tarjeta
                 </p>
                 <p className="text-[10px] text-purple-500">
-                  Se resta del efectivo de caja
+                  El pago en efectivo se registra en Caja
                 </p>
               </div>
               <p className="text-lg font-black text-purple-800">
@@ -637,7 +642,7 @@ export default function ReportsPage() {
                 <p className="text-xs font-bold text-green-700 uppercase">
                   Efectivo
                 </p>
-                <p className="text-[10px] text-green-600">Directo al lavador</p>
+                <p className="text-[10px] text-green-600">El pago en efectivo se registra en Caja</p>
               </div>
               <p className="text-lg font-black text-green-800">
                 {formatMoney(tipsByMethod.Efectivo)}
@@ -694,6 +699,7 @@ export default function ReportsPage() {
 
         <button
           onClick={generateFinancialPDF}
+          disabled={!reportReady || cash.loading || !!cash.error}
           className="group relative overflow-hidden bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-black transition flex flex-col items-center justify-center gap-1 shadow-lg shadow-gray-400/20"
         >
           <div className="flex items-center gap-2">
@@ -701,7 +707,7 @@ export default function ReportsPage() {
             <span className="text-lg">Control Financiero Interno (PDF)</span>
           </div>
           <span className="text-xs font-normal text-gray-400">
-            Estadísticas completas y cuadre de caja
+            Estadísticas del período y saldo actual de caja
           </span>
         </button>
       </div>

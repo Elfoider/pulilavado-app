@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const ts = require("typescript");
 const React = require("react");
 
-function harness(services = []) {
+function harness(services = [], cash = { session: null, loading: false, error: "" }) {
   let cursor = 0;
   const states = [], tables = [], documents = [], notices = [];
   const hooks = {
@@ -25,6 +25,7 @@ function harness(services = []) {
   let fail = false;
   const localRequire = (name) => {
     if (name === "react") return hooks;
+    if (name === "@/lib/useCurrentCash") return { useCurrentCash: () => cash };
     if (name === "@/lib/firebase") return { db: {} };
     if (name === "firebase/firestore") return {
       collection: (_, path) => path, query: (path) => path, where() {},
@@ -36,7 +37,7 @@ function harness(services = []) {
     };
     if (name === "jspdf") return class PDF {
       constructor() { this.texts = []; documents.push(this); }
-      setFontSize() {} setFont() {}
+      setFontSize() {} setFont() {} setTextColor() {} setDrawColor() {} setFillColor() {} rect() {}
       text(value) { this.texts.push(value); }
       save(filename) { this.filename = filename; }
     };
@@ -122,4 +123,26 @@ test("empty, failed or changed-period reports cannot export stale payroll", asyn
   try { await h.refresh(); } finally { console.error = originalError; }
   assert.equal(h.button("Reporte de Pago de Nómina").props.disabled, true);
   assert.match(h.textOf(h.render()), /No se pudo cargar el reporte/);
+});
+
+
+test("financial report and PDF follow current cash after a tip payment, independent of period receipts", async () => {
+  const cash = { session: { balances: { Efectivo: 12 } }, loading: false, error: "" };
+  const h = harness([service("a", "Ana", 5, {paymentMethod: "Efectivo"})], cash);
+  await h.refresh();
+  const cashCard = () => h.nodes(h.render()).find(n => n.type === "h3" && n.props.className === "text-4xl font-black tracking-tight");
+  assert.equal(h.textOf(cashCard()), "$12.00");
+  cash.session.balances.Efectivo = 7;
+  assert.equal(h.textOf(cashCard()), "$7.00");
+  h.button("Control Financiero Interno").props.onClick();
+  assert.ok(h.documents[0].texts.includes("EFECTIVO EN CAJA ACTUAL"));
+  assert.ok(h.documents[0].texts.includes("$7.00"));
+  assert.ok(h.tables.some(table => table.body.some(row => row.includes("$20.00"))));
+  cash.session = null;
+  assert.equal(h.textOf(cashCard()), "Sin caja abierta");
+  cash.error = "No se pudo consultar el saldo de Caja.";
+  assert.equal(h.textOf(cashCard()), "No disponible");
+  assert.equal(h.button("Control Financiero Interno").props.disabled, true);
+  h.button("Control Financiero Interno").props.onClick();
+  assert.equal(h.documents.length, 1);
 });

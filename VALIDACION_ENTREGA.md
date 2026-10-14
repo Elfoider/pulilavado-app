@@ -44,3 +44,8 @@ Con esa instalación limpia también aprobaron las 36 pruebas, ESLint y la compi
 39 pruebas aprobadas. Las tres nuevas ejecutan la carga, selección y exportación del componente con datos Firebase y PDF simulados. Comprueban selección por identificador con nombres iguales, suma de varios servicios de un mismo lavador, exclusión de pendientes/anulados, persistencia al actualizar, total y filas del PDF, seleccionar todos/quitar selección y bloqueo ante lista vacía, error o cambio de período. Las fechas de los controles se generan en hora local, sin desplazarlas al convertir a UTC. No se modificaron las versiones de dependencias.
 
 Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuración TLS descrita anteriormente). La instalación con caché vacía se validó al corregir 1.3.3; 1.3.4 conserva exactamente las dependencias de esa corrección.
+
+
+## Actualización 1.3.7 — vínculo entre Caja y Reportes
+
+43 pruebas automatizadas aprobadas; ESLint y compilación de producción aprobados. El caso de efectivo $12 menos pago de propinas $5 arroja $7, tanto en la suscripción de caja como en la pantalla y PDF financiero. También se verifican reintentos sin doble descuento, cambios/cierre de sesión y errores de lectura. No se ejecutaron escrituras en Firebase de producción.
