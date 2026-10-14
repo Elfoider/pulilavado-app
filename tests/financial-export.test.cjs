@@ -35,3 +35,15 @@ test('historical receipt and tip order, including a correction in one transactio
  const sorted=detailMovements([...old].reverse(),historic);assert.ok(sorted.every(m=>m.balanceSource==='Reconstruido'));
  assert.equal(sorted[1].kind,'service_payment');assert.equal(sorted[2].balancesBefore.Yappy,52);
 });
+
+
+test('Excel worksheet elements follow Open XML order and panes belong inside a sheetView',()=>{
+ const z=unzipSync(financialExcel(report));const summary=strFromU8(z['xl/worksheets/sheet1.xml']);const details=strFromU8(z['xl/worksheets/sheet2.xml']);
+ const order=['<sheetPr>','<dimension ','<sheetViews>','<cols>','<sheetData>','<mergeCells ','<printOptions ','<pageMargins ','<pageSetup ','<ignoredErrors>','<drawing '];
+ let previous=-1;
+ for(const tag of order){const index=summary.indexOf(tag);assert.ok(index>previous,`${tag} fuera del orden requerido por CT_Worksheet`);previous=index;}
+ assert.match(summary,/<dimension ref="A1:P39"\/>/);
+ assert.equal((summary.match(/<sheetPr>/g)||[]).length,1);
+ assert.match(details,/<sheetViews><sheetView\b[^>]*><pane\b[^>]*\/><\/sheetView><\/sheetViews>/);
+ assert.doesNotMatch(details,/<sheetViews><pane\b/);
+});

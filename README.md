@@ -1,6 +1,6 @@
 # Sistema Pulilavado / Mr. Espuma
 
-Actualización 1.3.9 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
+Actualización 1.3.10 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
 
 Lea [GUIA_ACTUALIZACION.md](GUIA_ACTUALIZACION.md) para instalación, configuración de Firebase, reglas operativas, tratamiento de datos históricos y pruebas.
 
@@ -23,3 +23,5 @@ Reportes y Finanzas muestra el efectivo de la caja abierta en tiempo real, inclu
 La tarjeta «Efectivo neto de la jornada» muestra el saldo de la caja abierta menos su fondo inicial. Los ingresos por método del período conservan sus importes brutos.
 
 La versión 1.3.9 incorpora el reporte financiero con gráficas, exportación a Excel (Resumen y Movimientos) y los saldos antes/después de cada nuevo movimiento. Consulte [REPORTES_Y_MOVIMIENTOS.md](REPORTES_Y_MOVIMIENTOS.md).
+
+La versión 1.3.10 corrige la estructura Open XML de la exportación para evitar que Excel repare o descarte la hoja Resumen.

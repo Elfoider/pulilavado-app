@@ -59,3 +59,8 @@ Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuraci
 ## Actualización 1.3.9
 
 52 pruebas automatizadas: movimientos con secuencia/saldos, concurrencia, reintentos, exportación consistente, reconstrucción controlada, PDF de una página y Excel con dos hojas y dos gráficas. ESLint y build de producción. Prueba de integración con Firestore emulado: cobros, correcciones, retiros concurrentes, reintentos y estados antes/después. Ejemplos construidos con el reporte del 13/10/2026 y sus 19 movimientos.
+
+
+## Corrección 1.3.10 — apertura del Excel
+
+Se corrige el orden de printOptions/pageMargins/pageSetup respecto a ignoredErrors y se ubica pane dentro de sheetView (no sheetViews). La dimensión del resumen incluye las celdas combinadas y el área de impresión. Prueba de regresión de estructura, además de importes y gráficas, añadida al conjunto automatizado.

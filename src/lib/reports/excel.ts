@@ -51,11 +51,15 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   styled = styled.replace(/<cellXfs count="\d+">([\s\S]*?)<\/cellXfs>/, `<cellXfs count="${xfCount+3}">$1${extra}</cellXfs>`); files['xl/styles.xml']=strToU8(styled);
   let sheet = strFromU8(files['xl/worksheets/sheet1.xml']);
   sheet = sheet.replace(/<c r="([A-Z]+)(\d+)"([^>]*)>/g, (whole,col,r,rest)=> { const row=Number(r); const style = [1,2,5,12,19,26].includes(row) ? xfCount : row===6 ? xfCount+1 : null; return style===null ? whole : `<c r="${col}${r}"${rest.replace(/ s="\d+"/,'')} s="${style}">`; });
-  sheet=sheet.replace('</worksheet>', '<printOptions gridLines="0"/><pageMargins left="0.25" right="0.25" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/><drawing r:id="rIdCharts"/></worksheet>');
+  const printing = '<printOptions gridLines="0"/><pageMargins left="0.25" right="0.25" top="0.3" bottom="0.3" header="0.1" footer="0.1"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/>';
+  // CT_Worksheet requires printing before ignoredErrors, then drawings.
+  sheet = sheet.includes('<ignoredErrors>') ? sheet.replace('<ignoredErrors>', printing + '<ignoredErrors>') : sheet.replace('</worksheet>', printing + '</worksheet>');
+  sheet = sheet.replace('</worksheet>', '<drawing r:id="rIdCharts"/></worksheet>');
+  sheet = sheet.replace(/<dimension ref="[^"]*"\/>/, '<dimension ref="A1:P39"/>');
   sheet=sheet.replace(/<worksheet([^>]*)>/, '<worksheet$1><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>').replace(/<sheetView /,'<sheetView showGridLines="0" ');
   files['xl/worksheets/sheet1.xml']=strToU8(sheet);
   let detailSheet = strFromU8(files['xl/worksheets/sheet2.xml']);
-  detailSheet = detailSheet.replace(/<sheetView([^>]*)>/,'<sheetView$1><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>');
+  detailSheet = detailSheet.replace(/<sheetView\b([^>]*?)(\/>|>)/, (_, attrs, ending) => `<sheetView${attrs}><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>${ending === '/>' ? '</sheetView>' : ''}`);
   detailSheet = detailSheet.replace(/<c r="([A-Z]+)1"([^>]*)>/g, (whole,col,rest)=>`<c r="${col}1"${rest.replace(/ s="\d+"/,'')} s="${xfCount}">`);
   files['xl/worksheets/sheet2.xml']=strToU8(detailSheet);
   files['xl/worksheets/_rels/sheet1.xml.rels']=strToU8('<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdCharts" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
