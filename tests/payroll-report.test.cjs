@@ -152,7 +152,7 @@ test("net cash excludes opening fund and paid tips while period cash sales remai
   const cash = { session: { balances: { Efectivo: 72 }, openingAmount: 65 }, loading: false, error: "" };
   const h = harness([service("a", "Ana", 3, { paymentMethod: "Efectivo", financials: { totalPrice: 12, washerEarnings: 3, businessEarnings: 9 } })], cash);
   await h.refresh();
-  const card = () => h.nodes(h.render()).find(n => n.props?.["aria-label"] === "Efectivo neto de la jornada");
+  const card = () => h.nodes(h.render()).find(n => n.props?.["aria-label"] === "Efectivo a guardar de la jornada");
   assert.match(h.textOf(card()), /\$7\.00/);
   // The original payment-method card continues reporting gross period income.
   const gross = h.nodes(h.render()).find(n => typeof n.type === "function" && n.props.title === "Efectivo");

@@ -532,15 +532,11 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm" aria-label="Efectivo neto de la jornada">
+        <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-sm" aria-label="Efectivo a guardar de la jornada">
           <p className="text-emerald-700 text-xs font-bold uppercase tracking-wider mb-2">
-            Efectivo neto de la jornada
+            Efectivo a guardar de la jornada
           </p>
           <h3 className="text-3xl font-black text-emerald-900">{netCashLabel}</h3>
-          <p className="text-emerald-700 text-xs mt-2">
-            Entradas menos salidas en efectivo de la caja abierta, sin fondo inicial. Incluye los pagos de propinas registrados.
-          </p>
-          <p className="text-emerald-700 text-xs mt-1">Independiente del filtro de fechas.</p>
         </div>
 
         <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">
