@@ -25,6 +25,14 @@ function harness(services = [], cash = { session: null, loading: false, error: "
   let fail = false;
   const localRequire = (name) => {
     if (name === "react") return hooks;
+    if (name === "@/lib/reports/loadCash") return {loadCashReport: async () => ({session: cash.session, movements: []})};
+    if (name === "@/lib/reports/excel") return {financialExcel() {}, saveExcel() {}};
+    if (name === "@/lib/reports/pdf") {
+      const pdfModule = {exports:{}};
+      const code = ts.transpileModule(fs.readFileSync("src/lib/reports/pdf.ts", "utf8"), {compilerOptions:{module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText;
+      new Function("require","module","exports",code)((n)=>n === "./fonts" ? {normalFont:"",boldFont:""} : n === "./cash" ? require("../.test-build/reports/cash.js") : n === "../operations/model" ? require("../.test-build/operations/model.js") : localRequire(n),pdfModule,pdfModule.exports);
+      return pdfModule.exports;
+    }
     if (name === "@/lib/useCurrentCash") return { useCurrentCash: () => cash };
     if (name === "@/lib/firebase") return { db: {} };
     if (name === "firebase/firestore") return {
@@ -37,7 +45,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
     };
     if (name === "jspdf") return class PDF {
       constructor() { this.texts = []; documents.push(this); }
-      setFontSize() {} setFont() {} setTextColor() {} setDrawColor() {} setFillColor() {} rect() {}
+      addFileToVFS() {} addFont() {} setFontSize() {} setFont() {} setTextColor() {} setDrawColor() {} setFillColor() {} rect() {} roundedRect() {} triangle() {} circle() {} line() {} lines() {}
       text(value) { this.texts.push(value); }
       save(filename) { this.filename = filename; }
     };
@@ -127,15 +135,15 @@ test("empty, failed or changed-period reports cannot export stale payroll", asyn
 
 
 test("financial report and PDF follow current cash after a tip payment, independent of period receipts", async () => {
-  const cash = { session: { balances: { Efectivo: 12 } }, loading: false, error: "" };
+  const cash = { session: { balances: { Efectivo: 12 }, openingAmount: 0 }, loading: false, error: "" };
   const h = harness([service("a", "Ana", 5, {paymentMethod: "Efectivo"})], cash);
   await h.refresh();
   const cashCard = () => h.nodes(h.render()).find(n => n.type === "h3" && n.props.className === "text-4xl font-black tracking-tight");
   assert.equal(h.textOf(cashCard()), "$12.00");
   cash.session.balances.Efectivo = 7;
   assert.equal(h.textOf(cashCard()), "$7.00");
-  h.button("Control Financiero Interno").props.onClick();
-  assert.ok(h.documents[0].texts.includes("EFECTIVO EN CAJA ACTUAL"));
+  await h.button("Control Financiero Interno").props.onClick();
+  assert.ok(h.documents[0].texts.includes("SALDO TOTAL EN CAJA"));
   assert.ok(h.documents[0].texts.includes("$7.00"));
   assert.ok(h.tables.some(table => table.body.some(row => row.includes("$20.00"))));
   cash.session = null;
@@ -143,7 +151,7 @@ test("financial report and PDF follow current cash after a tip payment, independ
   cash.error = "No se pudo consultar el saldo de Caja.";
   assert.equal(h.textOf(cashCard()), "No disponible");
   assert.equal(h.button("Control Financiero Interno").props.disabled, true);
-  h.button("Control Financiero Interno").props.onClick();
+  await h.button("Control Financiero Interno").props.onClick();
   assert.equal(h.documents.length, 1);
 });
 
@@ -157,9 +165,10 @@ test("net cash excludes opening fund and paid tips while period cash sales remai
   // The original payment-method card continues reporting gross period income.
   const gross = h.nodes(h.render()).find(n => typeof n.type === "function" && n.props.title === "Efectivo");
   assert.equal(gross.props.amount, 12);
-  h.button("Control Financiero Interno").props.onClick();
+  await h.button("Control Financiero Interno").props.onClick();
   assert.ok(h.documents[0].texts.includes("$72.00"));
-  assert.deepEqual(h.tables[0].body[0], ["Efectivo neto de la jornada (sin fondo inicial)", "$7.00"]);
+  assert.ok(h.documents[0].texts.includes("Efectivo a guardar de la jornada"));
+  assert.ok(h.documents[0].texts.includes("$7.00"));
   cash.session.balances.Efectivo = 60;
   assert.match(h.textOf(card()), /\$-5\.00/); // Outflows may use part of the opening fund.
   assert.equal(gross.props.amount, 12);

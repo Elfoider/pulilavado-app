@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const ts = require("typescript");
 const React = require("react");
 const { renderToStaticMarkup } = require("react-dom/server");
-const model = require("../.test-build/model.js");
+const model = require("../.test-build/operations/model.js");
 
 function renderCash(data) {
   const code = ts.transpileModule(
@@ -24,6 +24,7 @@ function renderCash(data) {
     if (name === "@/lib/operations/model") return model;
     if (name === "@/lib/operations")
       return { newId: () => "test-id", operations: {} };
+    if (name === "@/lib/reports/cash") return require("../.test-build/reports/cash.js");
     if (name === "@/lib/firebase") return { db: {} };
     if (name === "notistack") return { enqueueSnackbar() {} };
     if (name === "next/link")

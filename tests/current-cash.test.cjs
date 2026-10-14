@@ -2,8 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const ts = require('typescript');
-const { createOperations } = require('../.test-build/core.js');
-const model = require('../.test-build/model.js');
+const { createOperations } = require('../.test-build/operations/core.js');
+const model = require('../.test-build/operations/model.js');
 
 function harness() {
   let state, cleanup;

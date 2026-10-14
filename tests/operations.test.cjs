@@ -1,7 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createOperations } = require("../.test-build/core.js");
-const { commission, money, quantities } = require("../.test-build/model.js");
+const { createOperations } = require("../.test-build/operations/core.js");
+const { commission, money, quantities } = require("../.test-build/operations/model.js");
 
 function fixture() {
   let counter = 0,
@@ -48,7 +48,15 @@ function fixture() {
           );
         },
       });
-      for (const [path, data] of staged) docs.set(path, data);
+      for (const [path, data] of staged) {
+        if (path.startsWith("cashMovements/")) {
+          assert.ok(data.sequence >= 1);
+          for (const method of ["Efectivo", "Yappy", "Tarjeta", "Transferencia"]) {
+            assert.equal(data.balancesAfter[method], money(data.balancesBefore[method] + (method === data.method ? data.amount : 0)));
+          }
+        }
+        docs.set(path, data);
+      }
       return result;
     });
     tail = run.catch(() => {});
@@ -533,7 +541,7 @@ test("cash data validation rejects missing, partial, null and nonnumeric balance
   const {
     cashSessionProblem,
     isCashSession,
-  } = require("../.test-build/model.js");
+  } = require("../.test-build/operations/model.js");
   const valid = {
     id: "c",
     status: "open",
@@ -589,4 +597,16 @@ test("legacy close rejects unknown shapes and modern sessions without changing t
   await f.api.openCash(10, "new");
   await assert.rejects(f.api.closeLegacyCash("new", 10, "Review"));
   assert.equal(f.get("cashSessions/new").status, "open");
+});
+
+
+test("cash movement snapshots remain ordered and immutable through concurrent withdrawals and retries", async () => {
+  const f=fixture();await f.api.openCash(12,"c");
+  await Promise.all([f.api.cashMove(5,"Efectivo","withdrawal","Propinas","p"),f.api.cashMove(2,"Efectivo","expense","Gasto","e")]);
+  await f.api.cashMove(5,"Efectivo","withdrawal","Propinas","p");
+  const rows=f.movements("cashMovements").sort((a,b)=>a.sequence-b.sequence);
+  assert.deepEqual(rows.map(r=>r.sequence),[1,2,3]);
+  assert.equal(rows[1].balancesBefore.Efectivo,12);assert.equal(rows[1].balancesAfter.Efectivo,7);
+  assert.equal(rows[2].balancesBefore.Efectivo,7);assert.equal(rows[2].balancesAfter.Efectivo,5);
+  assert.equal(f.get("cashSessions/c").movementSequence,3);
 });

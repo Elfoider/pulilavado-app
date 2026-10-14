@@ -1,13 +1,13 @@
 {
   "name": "pulilavado-app",
-  "version": "1.3.8",
+  "version": "1.3.9",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsc src/lib/operations/model.ts src/lib/operations/core.ts --outDir .test-build --module commonjs --target ES2022 --skipLibCheck --strict && node --test tests/*.test.cjs"
+    "test": "tsc src/lib/operations/model.ts src/lib/operations/core.ts src/lib/reports/cash.ts src/lib/reports/pdf.ts src/lib/reports/excel.ts --outDir .test-build --module commonjs --target ES2022 --skipLibCheck --strict --esModuleInterop && node --test tests/*.test.cjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
@@ -21,7 +21,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "tailwind-merge": "^3.4.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "fflate": "^0.8.2"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

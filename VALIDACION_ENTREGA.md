@@ -54,3 +54,8 @@ Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuraci
 ## Actualización 1.3.8 — efectivo neto sin fondo inicial
 
 44 pruebas automatizadas aprobadas, ESLint y build de producción aprobados. Nuevo caso: apertura $65, saldo total $72 y ventas en efectivo del período $12; la tarjeta neta y la fila del PDF muestran $7 y el desglose original mantiene $12. Se verifica también que una salida que utiliza el fondo puede dejar efectivo neto negativo.
+
+
+## Actualización 1.3.9
+
+52 pruebas automatizadas: movimientos con secuencia/saldos, concurrencia, reintentos, exportación consistente, reconstrucción controlada, PDF de una página y Excel con dos hojas y dos gráficas. ESLint y build de producción. Prueba de integración con Firestore emulado: cobros, correcciones, retiros concurrentes, reintentos y estados antes/después. Ejemplos construidos con el reporte del 13/10/2026 y sus 19 movimientos.

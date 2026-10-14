@@ -11,7 +11,7 @@ const {
   serverTimestamp,
   getDocs,
 } = require("firebase/firestore");
-const { createOperations } = require("../.test-build/core.js");
+const { createOperations } = require("../.test-build/operations/core.js");
 if (!process.env.FIRESTORE_EMULATOR_HOST)
   throw new Error("These tests require a local Firestore emulator.");
 const app = initializeApp({
@@ -105,6 +105,13 @@ async function main() {
   await ops.openCash(0, "next-c");
   await assert.rejects(ops.cancelSale("final-sale", "Error"), /cerrada/);
   assert.equal((await read("products/p")).stock, 9);
+  await ops.cashMove(12,"Efectivo","income","Fondo de prueba","fund");
+  await Promise.all([ops.cashMove(5,"Efectivo","withdrawal","Propinas","tips"),ops.cashMove(2,"Efectivo","expense","Gasto","expense")]);
+  await ops.cashMove(5,"Efectivo","withdrawal","Propinas","tips");
+  assert.equal((await read("cashSessions/next-c")).balances.Efectivo,5);
+  const tip=await read("cashMovements/tips");
+  assert.equal(tip.balancesBefore.Efectivo-tip.balancesAfter.Efectivo,5);
+  assert.equal(tip.sequence >= 2,true);
   for (const c of ["cashMovements", "inventoryMovements"])
     assert.ok((await getDocs(collection(db, c))).size > 0);
   console.log(

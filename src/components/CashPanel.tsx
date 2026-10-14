@@ -25,6 +25,7 @@ import {
   DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { movementKinds } from "@/lib/reports/cash";
 
 export default function CashPanel() {
   const {
@@ -427,20 +428,6 @@ function CashMovements({ sessionId }: { sessionId: string }) {
       setBusy(false);
     }
   }
-  const kinds: Record<string, string> = {
-    opening: "Apertura",
-    expense: "Gasto",
-    withdrawal: "Retiro",
-    income: "Ingreso",
-    sale: "Venta",
-    sale_refund: "Anulación venta",
-    service_payment: "Cobro servicio",
-    service_payment_tip: "Propina",
-    service_correction: "Reversión cobro",
-    service_correction_tip: "Reversión propina",
-    service_refund: "Anulación servicio",
-    service_refund_tip: "Devolución propina",
-  };
   return (
     <section className="bg-white border rounded-2xl p-5">
       <h2 className="text-xl font-bold mb-3">Movimientos de esta caja</h2>
@@ -453,7 +440,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         <table className="w-full text-sm text-left">
           <thead>
             <tr>
-              {["Fecha", "Tipo", "Método", "Monto", "Detalle / referencia"].map(
+              {["Fecha", "Tipo", "Método", "Monto", "Saldo método antes", "Saldo método después", "Efectivo antes", "Efectivo después", "Detalle / referencia"].map(
                 (h) => (
                   <th key={h} className="p-3">
                     {h}
@@ -470,9 +457,10 @@ function CashMovements({ sessionId }: { sessionId: string }) {
                     ? new Date(m.createdAt.seconds * 1000).toLocaleString()
                     : "..."}
                 </td>
-                <td className="p-3">{kinds[m.kind] ?? m.kind}</td>
+                <td className="p-3">{movementKinds[m.kind] ?? m.kind}</td>
                 <td className="p-3">{m.method}</td>
                 <td className="p-3 font-bold">${m.amount.toFixed(2)}</td>
+                {[m.balancesBefore?.[m.method], m.balancesAfter?.[m.method], m.balancesBefore?.Efectivo, m.balancesAfter?.Efectivo].map((value, index) => <td key={index} className="p-3 whitespace-nowrap">{typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(2)}` : "No registrado"}</td>)}
                 <td className="p-3">
                   {m.description}
                   <p className="text-xs text-gray-400 break-all">
@@ -498,7 +486,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         </button>
       )}
       <p className="text-xs text-gray-500 mt-2">
-        Los movimientos se cargan en grupos de 100. Vuelva a seleccionar la caja
+        Los saldos antes y después se registran desde esta versión. Los movimientos anteriores conservan sus datos. Los movimientos se cargan en grupos de 100. Vuelva a seleccionar la caja
         para actualizar el detalle.
       </p>
     </section>

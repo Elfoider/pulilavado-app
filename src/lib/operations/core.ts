@@ -51,17 +51,22 @@ export function createOperations(
     }[],
   ) {
     const balances = { ...session.balances };
+    let sequence = session.movementSequence ?? 0;
     let receipts = session.receipts || 0,
       tips = session.tips || 0,
       expenses = session.expenses || 0;
     for (const e of entries) {
       if (!e.amount) continue;
+      const balancesBefore = { ...balances };
       balances[e.method] = money((balances[e.method] || 0) + e.amount);
       receipts = money(receipts + (e.receipts || 0));
       tips = money(tips + (e.tips || 0));
       expenses = money(expenses + (e.expenses || 0));
       tx.set(`cashMovements/${id()}`, {
         ...e,
+        sequence: ++sequence,
+        balancesBefore,
+        balancesAfter: { ...balances },
         sessionId: session.id,
         createdAt: stamp(),
       });
@@ -72,7 +77,7 @@ export function createOperations(
       );
     tx.set(
       `cashSessions/${session.id}`,
-      { balances, receipts, tips, expenses, updatedAt: stamp() },
+      { balances, movementSequence: sequence, receipts, tips, expenses, updatedAt: stamp() },
       true,
     );
   }
@@ -228,6 +233,7 @@ export function createOperations(
         tx.set(`cashSessions/${requestId}`, {
           status: "open",
           openingAmount: opening,
+          movementSequence: 1,
           balances: { ...emptyBalances(), Efectivo: opening },
           receipts: 0,
           tips: 0,
@@ -238,6 +244,9 @@ export function createOperations(
         tx.set(`cashMovements/${id()}`, {
           sessionId: requestId,
           kind: "opening",
+          sequence: 1,
+          balancesBefore: emptyBalances(),
+          balancesAfter: { ...emptyBalances(), Efectivo: opening },
           amount: opening,
           method: "Efectivo",
           referenceId: requestId,
@@ -291,6 +300,9 @@ export function createOperations(
         tx.set(`cashMovements/${requestId}`, {
           sessionId: session.id,
           amount: signed,
+          sequence: (session.movementSequence ?? 0) + 1,
+          balancesBefore: { ...session.balances },
+          balancesAfter: { ...session.balances, [pm]: money(session.balances[pm] + signed) },
           method: pm,
           kind,
           description: description.trim(),
@@ -300,6 +312,7 @@ export function createOperations(
         tx.set(
           `cashSessions/${session.id}`,
           {
+            movementSequence: (session.movementSequence ?? 0) + 1,
             balances: {
               ...session.balances,
               [pm]: money(session.balances[pm] + signed),

@@ -24,6 +24,10 @@ import autoTable from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
 import { useCurrentCash } from "@/lib/useCurrentCash";
+import { loadCashReport } from "@/lib/reports/loadCash";
+import { financialPDF } from "@/lib/reports/pdf";
+import { financialExcel, saveExcel } from "@/lib/reports/excel";
+import { type FinancialReport } from "@/lib/reports/cash";
 
 const dateInputValue = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -38,6 +42,7 @@ interface PayrollItem {
 
 export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   // CONTROL DE FECHAS
   const [filterType, setFilterType] = useState<"today" | "week" | "custom">(
@@ -318,122 +323,30 @@ export default function ReportsPage() {
   // ==========================================
   // 2. GENERAR PDF FINANCIERO (GERENCIAL)
   // ==========================================
-  const generateFinancialPDF = () => {
-    if (!reportReady || cash.loading || cash.error) {
+  const exportFinancial = async (format: "pdf" | "excel") => {
+    if (!reportReady || cash.loading || cash.error || exporting) {
       enqueueSnackbar("Espere a que se carguen el reporte y el saldo de Caja.", { variant: "warning" });
       return;
     }
-    const doc = new jsPDF();
-    const todayStr = new Date().toLocaleDateString();
-
-    // Título
-    doc.setFontSize(22);
-    doc.setTextColor(44, 62, 80);
-    doc.text("REPORTE FINANCIERO INTERNO", 14, 20);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Generado: ${new Date().toLocaleString()}`, 14, 28);
-    doc.text(
-      `${filterType === "week" ? `Desde ${customStart} hasta ${customEnd}` : filterType === "custom" ? `${customStart} a ${customEnd}` : ""}`,
-      14,
-      33,
-    );
-
-    // --- SECCIÓN 1: CAJA REAL ---
-    doc.setDrawColor(0);
-    doc.setFillColor(240, 240, 240);
-    doc.rect(14, 40, 180, 25, "F");
-
-    doc.setFontSize(14);
-    doc.setTextColor(0);
-    doc.text("EFECTIVO EN CAJA ACTUAL", 20, 50);
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(cashLabel, 20, 58);
-
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text("Saldo actual, independiente del periodo", 100, 58);
-
-    // --- SECCIÓN 2: ESTADÍSTICAS ---
-    let yPos = 75;
-
-    const kpiData = [
-      ["Efectivo neto de la jornada (sin fondo inicial)", netCashLabel],
-      ["Ventas servicios y productos", `${formatMoney(serviceSales)}`],
-      ["Propinas Totales", `${formatMoney(totalTips)}`],
-      ["Ingresos despues de comisiones", `${formatMoney(netBusinessProfit)}`],
-    ];
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [["Concepto", "Monto"]],
-      body: kpiData,
-      theme: "striped",
-      headStyles: { fillColor: [52, 73, 94] },
-    });
-
-    // --- SECCIÓN 3: DESGLOSE SERVICIOS ---
-    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
-    doc.text("Desglose Ingresos (Ventas)", 14, yPos);
-
-    autoTable(doc, {
-      startY: yPos + 5,
-      head: [["Método", "Monto"]],
-      body: [
-        ["Efectivo", `${formatMoney(incomeByMethod.Efectivo)}`],
-        ["Yappy", `${formatMoney(incomeByMethod.Yappy)}`],
-        ["Tarjeta", `${formatMoney(incomeByMethod.Tarjeta)}`],
-        ["ACH/Otro", `${formatMoney(incomeByMethod.Transferencia)}`],
-      ],
-      theme: "grid",
-    });
-
-    // --- SECCIÓN 4: CIERRE DE CAJA ---
-    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
-    doc.setFontSize(12);
-    doc.text("Resumen de cobros", 14, yPos);
-
-    autoTable(doc, {
-      startY: yPos + 5,
-      head: [["Operación", "Monto"]],
-      body: [
-        ["Total del dia", `${formatMoney(serviceSales)}`],
-        [
-          "Total Yappy",
-          `${formatMoney(parseFloat(incomeByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)))}`,
-        ],
-        ["Tarjeta", `${formatMoney(incomeByMethod.Tarjeta)}`],
-        [
-          "Total Propina",
-          `${formatMoney(parseFloat(tipsByMethod.Efectivo.toFixed(2)) + parseFloat(tipsByMethod.Yappy.toFixed(2)) + parseFloat(tipsByMethod.Tarjeta.toFixed(2)))}`,
-        ],
-      ],
-      theme: "grid",
-    });
-
-    // --- SECCIÓN 5: DESGLOSE PROPINAS ---
-    yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
-    doc.text("Desglose Propinas (Origen)", 14, yPos);
-
-    autoTable(doc, {
-      startY: yPos + 5,
-      head: [["Método", "Monto", "Efecto en Caja"]],
-      body: [
-        ["Efectivo", `${formatMoney(tipsByMethod.Efectivo)}`, "Ingreso efectivo"],
-        ["Yappy / Sin Esp.", `${formatMoney(tipsByMethod.Yappy)}`, "Ingreso digital"],
-        ["Tarjeta", `${formatMoney(tipsByMethod.Tarjeta)}`, "Ingreso digital"],
-      ],
-      theme: "grid",
-      headStyles: { fillColor: [243, 156, 18] }, // Naranja/Amarillo
-    });
-
-    doc.save(`Financiero_Detallado_${todayStr}.pdf`);
-    enqueueSnackbar("Reporte financiero generado exitosamente.", {
-      variant: "success",
-    });
+    setExporting(true);
+    const request = reportRequest.current;
+    try {
+      const snapshot = await loadCashReport();
+      if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
+      const report: FinancialReport = {
+        ...snapshot,
+        period: filterType === "today" ? `Ventas del día: ${dateInputValue(new Date())}` : filterType === "week" ? "Ventas de los últimos 7 días" : `Ventas: ${customStart} a ${customEnd}`,
+        generatedAt: new Date().toLocaleString(),
+        sales: serviceSales, business: netBusinessProfit, payroll: totalPayrollToPay,
+        income: incomeByMethod, tips: tipsByMethod,
+      };
+      const date = dateInputValue(new Date());
+      if (format === "pdf") financialPDF(report).save(`Financiero_${date}.pdf`);
+      else saveExcel(financialExcel(report), `Financiero_${date}.xlsx`);
+      enqueueSnackbar("Reporte financiero generado.", { variant: "success" });
+    } catch (error) {
+      enqueueSnackbar(error instanceof Error ? error.message : "No se pudo exportar el reporte.", { variant: "error" });
+    } finally { setExporting(false); }
   };
 
   return (
@@ -709,8 +622,8 @@ export default function ReportsPage() {
         </button>
 
         <button
-          onClick={generateFinancialPDF}
-          disabled={!reportReady || cash.loading || !!cash.error}
+          onClick={() => exportFinancial("pdf")}
+          disabled={!reportReady || cash.loading || !!cash.error || exporting}
           className="group relative overflow-hidden bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-black transition flex flex-col items-center justify-center gap-1 shadow-lg shadow-gray-400/20"
         >
           <div className="flex items-center gap-2">
@@ -720,6 +633,10 @@ export default function ReportsPage() {
           <span className="text-xs font-normal text-gray-400">
             Estadísticas del período y saldo actual de caja
           </span>
+        </button>
+        <button onClick={() => exportFinancial("excel")} disabled={!reportReady || cash.loading || !!cash.error || exporting} className="bg-emerald-700 text-white py-4 rounded-xl font-bold disabled:opacity-50">
+          {exporting ? "Preparando reporte…" : "Reporte financiero (Excel)"}
+          <span className="block text-xs font-normal mt-1">Resumen y movimientos detallados de la caja actual</span>
         </button>
       </div>
     </div>

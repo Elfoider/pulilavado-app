@@ -33,6 +33,7 @@ export interface CashSession {
   status: "open" | "closed";
   openingAmount: number;
   balances: Record<Method, number>;
+  movementSequence?: number;
   receipts: number;
   tips: number;
   expenses: number;
@@ -50,6 +51,9 @@ export interface CashMovement {
   method: Method;
   referenceId: string;
   description: string;
+  sequence?: number;
+  balancesBefore?: Record<Method, number>;
+  balancesAfter?: Record<Method, number>;
   createdAt?: { seconds: number };
 }
 export type Data = Record<string, unknown>;
@@ -107,6 +111,7 @@ export function cashSessionProblem(value: unknown): string | null {
   const data = value as Record<string, unknown>;
   if (data.status !== "open" && data.status !== "closed")
     return "Estado de caja desconocido.";
+  if (data.movementSequence != null && (typeof data.movementSequence !== "number" || !Number.isSafeInteger(data.movementSequence) || data.movementSequence < 0)) return "Secuencia de movimientos inválida.";
   const balances = data.balances;
   if (!balances || typeof balances !== "object")
     return "Faltan los saldos por método de pago (balances).";
