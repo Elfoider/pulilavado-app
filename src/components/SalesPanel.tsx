@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import { enqueueSnackbar } from "notistack";
+import PaymentEditor from "./PaymentEditor";
 import ProductCart from "./ProductCart";
 import { useCollection } from "@/lib/useCollection";
 import {
   CartItem,
-  METHODS,
+  PaymentPart,
   ProductLine,
   Data,
   isCashSession,
@@ -15,6 +16,7 @@ interface Sale {
   id: string;
   total: number;
   paymentMethod: string;
+  payments?: PaymentPart[];
   status: string;
   cashSessionId: string;
   lines: ProductLine[];
@@ -25,6 +27,8 @@ export default function SalesPanel() {
     [method, setMethod] = useState("Efectivo"),
     [busy, setBusy] = useState(false),
     [requestId, setRequestId] = useState(newId);
+  const [payments,setPayments]=useState<PaymentPart[]>([]);
+  const [total,setTotal]=useState(0);
   const { data: sales, error } = useCollection<Sale>("sales", "createdAt");
   const { data: sessions } = useCollection<Data & { id: string }>(
     "cashSessions",
@@ -75,9 +79,10 @@ export default function SalesPanel() {
           if (busy) return;
           setBusy(true);
           try {
-            await operations.sell(cart, method, requestId);
+            await operations.sell(cart, method === "Mixto" ? payments : method, requestId);
             setRequestId(newId());
             setCart([]);
+            setPayments([]);setMethod("Efectivo");
             enqueueSnackbar("Venta registrada. Stock y caja actualizados.", {
               variant: "success",
             });
@@ -93,27 +98,14 @@ export default function SalesPanel() {
         className="bg-white border rounded-2xl p-5 max-w-2xl space-y-4"
       >
         <ProductCart
+          onTotalChange={setTotal}
           value={cart}
           onChange={(v) => {
             setCart(v);
             setRequestId(newId());
           }}
         />
-        <label className="block text-sm font-bold">
-          Método de pago
-          <select
-            value={method}
-            onChange={(e) => {
-              setMethod(e.target.value);
-              setRequestId(newId());
-            }}
-            className="block w-full border p-3 rounded-lg mt-1"
-          >
-            {METHODS.map((m) => (
-              <option key={m}>{m}</option>
-            ))}
-          </select>
-        </label>
+        <PaymentEditor method={method} payments={payments} total={total} onChange={(method,parts)=>{setMethod(method);setPayments(parts);setRequestId(newId());}}/>
         <button
           disabled={busy || !open || !cart.length}
           className="w-full bg-cyan-700 text-white p-3 rounded-xl font-bold disabled:opacity-50"
@@ -157,7 +149,7 @@ export default function SalesPanel() {
                     {s.lines.map((l) => `${l.quantity} × ${l.name}`).join(", ")}
                   </td>
                   <td className="p-3 font-bold">${s.total.toFixed(2)}</td>
-                  <td className="p-3">{s.paymentMethod}</td>
+                  <td className="p-3">{s.payments?.map(part=>`${part.method}: $${part.amount.toFixed(2)}`).join(" · ") ?? s.paymentMethod}</td>
                   <td className="p-3">
                     {s.status === "cancelled" ? "Anulada" : "Pagada"}
                   </td>

@@ -30,6 +30,7 @@ import { financialExcel, saveExcel } from "@/lib/reports/excel";
 import { cashMovementBreakdown, type PeriodCash, type FinancialReport } from "@/lib/reports/cash";
 import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from "@/lib/operations/treasury-model";
 import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
+import { paymentParts } from "@/lib/operations/model";
 import { type TreasuryReport } from "@/lib/reports/treasury";
 import Link from "next/link";
 
@@ -157,13 +158,7 @@ export default function ReportsPage() {
           tempServiceSales += servicePrice;
           tempBusiness += fin.businessEarnings || 0;
 
-          const payMethod = (fin.paymentMethod ||
-            "Efectivo") as keyof typeof tempIncomeMethod;
-          if (tempIncomeMethod[payMethod] !== undefined) {
-            tempIncomeMethod[payMethod] += servicePrice;
-          } else {
-            tempIncomeMethod["Efectivo"] += servicePrice;
-          }
+          for (const part of paymentParts(servicePrice, fin.paymentMethod || "Efectivo", fin.payments)) tempIncomeMethod[part.method] += part.amount;
 
           // Propinas
           if (tip > 0) {
@@ -192,7 +187,7 @@ export default function ReportsPage() {
       });
 
       const salesSnap = await getDocs(query(collection(db, "sales"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
-      salesSnap.forEach(s => { const sale = s.data(); if (sale.status !== "paid") return; const total = Number(sale.total || 0); tempServiceSales += total; tempBusiness += total; const pm = sale.paymentMethod as keyof typeof tempIncomeMethod; if (tempIncomeMethod[pm] !== undefined) tempIncomeMethod[pm] += total; });
+      salesSnap.forEach(s => { const sale = s.data(); if (sale.status !== "paid") return; const total = Number(sale.total || 0); tempServiceSales += total; tempBusiness += total; for (const part of paymentParts(total, sale.paymentMethod, sale.payments)) tempIncomeMethod[part.method] += part.amount; });
       const advanceSnap = await getDocs(query(collection(db, "cashAdvances"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
       const periodAdvances: CashAdvance[] = [];
       advanceSnap.forEach(doc => {

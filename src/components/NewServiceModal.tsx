@@ -24,9 +24,11 @@ import {
   Coins,
   Palette,
 } from "lucide-react";
+import PaymentEditor from "./PaymentEditor";
+import ServiceCatalogPicker from "./ServiceCatalogPicker";
 import ProductCart from "./ProductCart";
 import { operations, newId } from "@/lib/operations";
-import { CartItem, commission } from "@/lib/operations/model";
+import { CartItem, commission, PaymentPart, ServiceLine, money } from "@/lib/operations/model";
 import { Washer } from "@/types";
 import MoneyInput from "./MoneyInput";
 import { enqueueSnackbar } from "notistack";
@@ -46,6 +48,9 @@ interface Client {
 }
 
 export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
+  const [serviceItems,setServiceItems]=useState<ServiceLine[]>([]);
+  const [payments,setPayments]=useState<PaymentPart[]>([]);
+  const [productsTotal,setProductsTotal]=useState(0);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [requestId, setRequestId] = useState(newId);
   const [loading, setLoading] = useState(false);
@@ -117,6 +122,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
 
       // Resetear formulario
       setCart([]);
+      setServiceItems([]);setPayments([]);setProductsTotal(0);
       setRequestId(newId());
       setClientName("");
       setClientPhone("");
@@ -175,7 +181,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
         clientName: clientName || "Cliente General", clientPhone: clientPhone || "N/A",
         vehicle: { model: vehicleModel, color: vehicleColor || "No especificado", bay: track },
         washerId: selectedWasherId, servicePrice: price,
-        paymentStatus: isPending ? "pending" : "paid", paymentMethod,
+        paymentStatus: isPending ? "pending" : "paid", paymentMethod, payments: paymentMethod === "Mixto" ? payments : undefined, serviceItems,
         tipAmount: hasTip ? tipAmount : 0, tipMethod, cart,
       }, requestId, true);
 
@@ -394,6 +400,8 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
             </button>
           </div>
 
+          <ServiceCatalogPicker value={serviceItems} onChange={lines=>{setServiceItems(lines);setPrice(money(lines.reduce((sum,line)=>sum+line.unitPrice,0)));}}/>
+          {serviceItems.length ? <p className="font-bold">Total de servicios: ${price.toFixed(2)}</p> : <MoneyInput label="Precio manual del lavado" value={price} onChange={setPrice}/>}
           {/* 4. SECCIÓN FINANCIERA (CONDICIONAL) */}
           {isPending ? (
             // --- MODO PENDIENTE ---
@@ -408,26 +416,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
             // --- MODO PAGADO (Inputs visibles) ---
             <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
               <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
-                <MoneyInput
-                  label="Precio del Servicio *"
-                  value={price}
-                  onChange={setPrice}
-                />
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
-                    Método de Pago
-                  </label>
-                  <select
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="w-full p-3 bg-white border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
-                  >
-                    <option>Efectivo</option>
-                    <option>Yappy</option>
-                    <option>Tarjeta</option>
-                    <option>Transferencia</option>
-                  </select>
-                </div>
+                <PaymentEditor method={paymentMethod} payments={payments} total={money(price+productsTotal)} onChange={(method,parts)=>{setPaymentMethod(method);setPayments(parts);}}/>
               </div>
 
               {/* SECCIÓN DE PROPINA */}
@@ -480,7 +469,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
             </div>
           )}
 
-          <ProductCart value={cart} onChange={setCart} servicePrice={price} tipAmount={!isPending && hasTip ? tipAmount : 0} />
+          <ProductCart onTotalChange={setProductsTotal} value={cart} onChange={setCart} servicePrice={price} tipAmount={!isPending && hasTip ? tipAmount : 0} />
           <p className="text-sm font-bold text-gray-600">Comisión del lavado: {(commission(washers.find(w => w.id === selectedWasherId)?.commissionPercentage, commissionPercent) * 100).toFixed(2)}%</p>
           {isPending && <MoneyInput label="Precio previsto del lavado (opcional)" value={price} onChange={setPrice} />}
           <p className="text-xs text-gray-500">Para cobrar se requiere una caja abierta. Los productos pendientes se reservan al guardar. El total de productos se suma al precio del lavado.</p>
@@ -497,7 +486,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
                 <Save className="w-6 h-6" />{" "}
                 {isPending
                   ? "Guardar Pendiente"
-                  : `Cobrar $${(price + (hasTip ? tipAmount : 0)).toFixed(2)}`}
+                  : `Cobrar $${money(price + productsTotal + (hasTip ? tipAmount : 0)).toFixed(2)}`}
               </>
             )}
           </button>

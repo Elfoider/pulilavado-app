@@ -23,11 +23,15 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { ServiceDocument, Washer } from "@/types";
+import PaymentEditor from "./PaymentEditor";
+import ServiceCatalogPicker from "./ServiceCatalogPicker";
 import ProductCart from "./ProductCart";
 import { CartItem, commission, money } from "@/lib/operations/model";
 import { operations } from "@/lib/operations";
 import MoneyInput from "./MoneyInput";
 import { enqueueSnackbar } from "notistack";
+
+import { type PaymentPart, type ServiceLine } from "@/lib/operations/model";
 
 interface Props {
   service: ServiceDocument;
@@ -35,6 +39,9 @@ interface Props {
 }
 
 export default function ServiceDetailsModal({ service, onClose }: Props) {
+  const [serviceItems,setServiceItems]=useState<ServiceLine[]>(service.serviceItems ?? []);
+  const [payments,setPayments]=useState<PaymentPart[]>(service.financials.payments ?? []);
+  const [currentProductsTotal,setCurrentProductsTotal]=useState(service.financials.productsTotal ?? 0);
   const [cart, setCart] = useState<CartItem[]>(service.products?.map(l => ({ productId: l.productId, quantity: l.quantity })) ?? []);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -58,6 +65,8 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
   useEffect(() => {
     if (service) {
       console.log("Cargando datos del servicio para edición:", service);
+      setServiceItems(service.serviceItems ?? []);setPayments(service.financials.payments ?? []);
+      setCart(service.products?.map(line=>({productId:line.productId,quantity:line.quantity})) ?? []);
       setFormData({
         clientName: service.clientName,
         clientPhone: service.clientPhone || "",
@@ -139,7 +148,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
       await operations.saveService({ clientName: formData.clientName, clientPhone: formData.clientPhone,
         vehicle: { model: formData.vehicleModel, color: formData.vehicleColor, bay: formData.vehicleBay },
         washerId: formData.washerId, servicePrice: formData.price, paymentStatus: formData.paymentStatus,
-        paymentMethod: formData.paymentMethod, tipAmount: formData.tipAmount, tipMethod: formData.tipMethod, cart,
+        paymentMethod: formData.paymentMethod, payments: formData.paymentMethod === "Mixto" ? payments : undefined, serviceItems, tipAmount: formData.tipAmount, tipMethod: formData.tipMethod, cart,
       }, service.id, false);
 
       setIsEditing(false);
@@ -188,6 +197,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
             {!isEditing && service.status !== "cancelled" && (
               <>
                 <button
+                  title="Editar servicio"
                   onClick={handleChangeEditing}
                   className="p-2 bg-white/10 hover:bg-blue-500/50 rounded-lg transition"
                 >
@@ -319,38 +329,10 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
               <div
                 className={`p-4 rounded-xl border space-y-3 ${formData.paymentStatus === "pending" ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
               >
-                <MoneyInput
-                  label="Precio del lavado"
-                  value={formData.price}
-                  onChange={(val) => setFormData({ ...formData, price: val })}
-                />
-
-                <div className="grid grid-cols-2 gap-3 mt-2">
-                  <div>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
-                      Método Pago
-                    </label>
-                    <select
-                      value={
-                        formData.paymentMethod === "Pendiente"
-                          ? ""
-                          : formData.paymentMethod
-                      }
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          paymentMethod: e.target.value,
-                        })
-                      }
-                      className="w-full p-2 border rounded-lg bg-white text-sm font-medium h-[42px]"
-                    >
-                      <option>Seleccionar...</option>
-                      <option>Efectivo</option>
-                      <option>Yappy</option>
-                      <option>Tarjeta</option>
-                      <option>Transferencia</option>
-                    </select>
-                  </div>
+                <ServiceCatalogPicker value={serviceItems} onChange={lines=>{setServiceItems(lines);setFormData({...formData,price:money(lines.reduce((sum,line)=>sum+line.unitPrice,0))});}}/>
+                {serviceItems.length ? <p className="font-bold">Total de servicios: ${formData.price.toFixed(2)}</p> : <MoneyInput label="Precio manual del lavado" value={formData.price} onChange={price=>setFormData({...formData,price})}/>}
+                <div className="grid grid-cols-1 gap-3 mt-2">
+                  {formData.paymentStatus === "paid" && <PaymentEditor method={formData.paymentMethod === "Pendiente" ? "" : formData.paymentMethod} payments={payments} total={money(formData.price+currentProductsTotal)} onChange={(method,parts)=>{setPayments(parts);setFormData({...formData,paymentMethod:method});}}/>}
                   <div>
                     <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">
                       Lavador
@@ -372,7 +354,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 </div>
               </div>
 
-              <ProductCart value={cart} onChange={setCart} previous={service.products ?? []} servicePrice={formData.price} tipAmount={formData.paymentStatus === "paid" ? formData.tipAmount : 0} />
+              <ProductCart onTotalChange={setCurrentProductsTotal} value={cart} onChange={setCart} previous={service.products ?? []} servicePrice={formData.price} tipAmount={formData.paymentStatus === "paid" ? formData.tipAmount : 0} />
               <p className="text-xs text-gray-600">Comisión del lavado: {(displayedRate * 100).toFixed(2)}%. Los productos se suman al lavado. Los cobros requieren caja abierta.</p>
               {/* Propinas (Igual que antes) */}
               <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200 space-y-3">
@@ -417,6 +399,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
             // --- MODO VISUALIZACIÓN ---
             <>
               {service.status === "cancelled" && <p className="rounded-xl bg-gray-100 p-3 font-bold">Servicio anulado. Este registro se conserva para consulta.</p>}
+              {(service.serviceItems?.length ?? 0)>0 && <section className="border rounded-xl p-4 space-y-2"><h3 className="font-bold">Servicios realizados</h3>{service.serviceItems?.map(line=><p key={line.catalogId} className="flex justify-between gap-3 text-sm"><span>{line.name}</span><b>${line.unitPrice.toFixed(2)}</b></p>)}</section>}
               {(service.products?.length ?? 0) > 0 && <section className="border rounded-xl p-4 space-y-2"><h3 className="font-bold">Productos del servicio</h3>{service.products?.map(l => <p className="text-sm flex justify-between" key={l.productId}><span>{l.quantity} × {l.name}</span><b>${l.total.toFixed(2)}</b></p>)}<p className="text-sm text-gray-500">Lavado: ${formData.price.toFixed(2)} · Productos: ${productsTotal.toFixed(2)}</p></section>}
               {formData.paymentStatus === "pending" && (
                 <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center gap-2 font-bold animate-pulse">
@@ -502,7 +485,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                   </div>
                   <div className="flex justify-between text-sm text-gray-600">
                     <span>
-                      Método: <b>{formData.paymentMethod}</b>
+                      Método: <b>{service.financials.payments?.map(part=>`${part.method}: $${part.amount.toFixed(2)}`).join(" · ") ?? formData.paymentMethod}</b>
                     </span>
                     {formData.paymentStatus === "paid" ? (
                       <span className="text-green-600 font-bold flex items-center gap-1">

@@ -25,6 +25,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
   let fail = false;
   const localRequire = (name) => {
     if (name === "react") return hooks;
+    if (name === "@/lib/operations/model") return require("../.test-build/operations/model.js");
     if (name === "@/lib/reports/cash") return require("../.test-build/reports/cash.js");
     if (name === "@/lib/reports/fonts") return {normalFont:"",boldFont:""};
     if(name === "@/lib/operations/treasury-model")return require("../.test-build/operations/treasury-model.js");
@@ -252,4 +253,11 @@ test("finance cards show period advances, gross commissions and cash breakdown w
  assert.match(h.textOf(card("Cobros digitales")),/\$100\.00/);
  h.nodes(h.render()).find(n=>n.type==="input" && n.props.type==="date").props.onChange({target:{value:"2026-10-01"}});
  assert.ok(!h.textOf(card("Vales entregados")).includes("$20.00"));
+});
+
+test('mixed service receipts are distributed by their actual methods in reports and PDF',async()=>{
+ const h=harness([service('a','Ana',5,{financials:{totalPrice:20,washerEarnings:5,businessEarnings:15,paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:8},{method:'Yappy',amount:12}],tipAmount:3,tipMethod:'Tarjeta'}})]);
+ await h.refresh();await h.button('Control Financiero Interno').props.onClick();
+ const table=h.tables.find(t=>t.head?.[0]?.[0]==='Método');
+ assert.equal(table.body.find(r=>r[0]==='Efectivo')[1],'$8.00');assert.equal(table.body.find(r=>r[0]==='Yappy')[1],'$12.00');assert.equal(table.body.find(r=>r[0]==='Tarjeta')[2],'$3.00');
 });

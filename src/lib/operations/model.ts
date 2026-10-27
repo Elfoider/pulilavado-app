@@ -154,3 +154,22 @@ export function isLegacyCashSession(value: unknown): boolean {
     !!s.openedAt && s.balances === undefined &&
     (s.status === undefined || (s.status === "closed" && s.isOpen === false));
 }
+
+export interface PaymentPart { method: Method; amount: number }
+export function paymentParts(total: number, fallback: string, parts?: PaymentPart[]): PaymentPart[] {
+  total = nonnegative(total, "Total");
+  if (parts === undefined) return [{method: method(fallback), amount: total}];
+  if (!Array.isArray(parts) || !parts.length || parts.length > 4) throw new Error("Indique los montos de cada método de pago.");
+  const amounts = emptyBalances();
+  for (const part of parts) {
+    const pm = method(part.method);
+    const amount = nonnegative(part.amount, "Monto de pago");
+    if (amount <= 0) throw new Error("Cada pago debe ser mayor a cero.");
+    amounts[pm] = money(amounts[pm] + amount);
+  }
+  if (money(Object.values(amounts).reduce((s,n)=>s+n,0)) !== total) throw new Error("La suma de los métodos de pago debe coincidir con el total de la venta, sin propina.");
+  return METHODS.filter(pm=>amounts[pm]>0).map(pm=>({method:pm,amount:amounts[pm]}));
+}
+export interface CatalogService { id: string; name: string; price: number; active: boolean }
+export interface ServiceSelection { catalogId: string; unitPrice: number }
+export interface ServiceLine extends ServiceSelection { name: string; basePrice: number }

@@ -610,3 +610,43 @@ test("cash movement snapshots remain ordered and immutable through concurrent wi
   assert.equal(rows[2].balancesBefore.Efectivo,7);assert.equal(rows[2].balancesAfter.Efectivo,5);
   assert.equal(f.get("cashSessions/c").movementSequence,3);
 });
+
+test('split product sale settles and refunds each method exactly once, stock and cash roll back on mismatch', async()=>{
+ const f=fixture();await f.api.openCash(10,'c');
+ await assert.rejects(f.api.sell([{productId:'p1',quantity:2}],[{method:'Efectivo',amount:1},{method:'Yappy',amount:2}],'bad'),/suma/);
+ assert.equal(f.get('products/p1').stock,10);assert.equal(f.get('cashSessions/c').balances.Efectivo,10);
+ const parts=[{method:'Yappy',amount:2},{method:'Efectivo',amount:2}];
+ await f.api.sell([{productId:'p1',quantity:2}],parts,'mixed');await f.api.sell([{productId:'p1',quantity:2}],parts,'mixed');
+ assert.equal(f.get('cashSessions/c').balances.Efectivo,12);assert.equal(f.get('cashSessions/c').balances.Yappy,2);assert.equal(f.get('cashSessions/c').receipts,4);assert.equal(f.get('products/p1').stock,8);
+ assert.equal(f.get('sales/mixed').paymentMethod,'Mixto');assert.equal(f.movements('cashMovements').filter(row=>row.kind==='sale').length,2);
+ await f.api.cancelSale('mixed','Anular');await f.api.cancelSale('mixed','Reintento');assert.equal(f.get('cashSessions/c').balances.Efectivo,10);assert.equal(f.get('cashSessions/c').balances.Yappy,0);assert.equal(f.get('products/p1').stock,10);
+});
+test('mixed service payments correct allocations, preserve independent tips and reverse original methods on cancellation',async()=>{
+ const f=fixture();await f.api.openCash(30,'c');const input=f.input({paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:10},{method:'Yappy',amount:10}],tipAmount:3,tipMethod:'Tarjeta'});
+ await f.api.saveService(input,'s',true);assert.equal(f.get('cashSessions/c').balances.Efectivo,40);assert.equal(f.get('cashSessions/c').balances.Yappy,10);assert.equal(f.get('cashSessions/c').balances.Tarjeta,3);
+ const changed={...input,payments:[{method:'Efectivo',amount:5},{method:'Yappy',amount:15}]};await f.api.saveService(changed,'s',false);await f.api.saveService(changed,'s',false);
+ assert.equal(f.get('cashSessions/c').balances.Efectivo,35);assert.equal(f.get('cashSessions/c').balances.Yappy,15);assert.equal(f.get('cashSessions/c').balances.Tarjeta,3);assert.equal(f.get('cashSessions/c').receipts,20);
+ await f.api.cancelService('s','Anular');assert.equal(f.get('cashSessions/c').balances.Efectivo,30);assert.equal(f.get('cashSessions/c').balances.Yappy,0);assert.equal(f.get('cashSessions/c').balances.Tarjeta,0);
+});
+test('payment allocation validates methods, finite positive amounts and exact cents, and closed cash blocks redistribution',async()=>{
+ const {paymentParts}=require('../.test-build/operations/model.js');
+ for(const parts of [[],[{method:'BTC',amount:20}],[{method:'Efectivo',amount:-20}],[{method:'Efectivo',amount:NaN}],[{method:'Efectivo',amount:19.99}],[{method:'Efectivo',amount:0},{method:'Yappy',amount:20}]])assert.throws(()=>paymentParts(20,'Mixto',parts));
+ assert.deepEqual(paymentParts(.3,'Mixto',[{method:'Efectivo',amount:.1},{method:'Yappy',amount:.2}]),[{method:'Efectivo',amount:.1},{method:'Yappy',amount:.2}]);
+ const f=fixture();await f.api.openCash(0,'c');const input=f.input({paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:10},{method:'Yappy',amount:10}]});await f.api.saveService(input,'s',true);await f.api.closeCash('c',10,'');await f.api.openCash(0,'new');await assert.rejects(f.api.saveService({...input,payments:[{method:'Efectivo',amount:5},{method:'Yappy',amount:15}]},'s',false),/cerrada/);
+});
+test('catalog selections sum overridden vehicle prices without changing catalog; snapshots survive catalog edits and deactivation',async()=>{
+ const f=fixture();await f.api.saveCatalogService('wash',{name:'Lavado',price:15,active:true});await f.api.saveCatalogService('wax',{name:'Cera',price:10,active:true});await f.api.openCash(0,'c');
+ await f.api.saveService(f.input({servicePrice:999,serviceItems:[{catalogId:'wash',unitPrice:12},{catalogId:'wax',unitPrice:8}],cart:[{productId:'p1',quantity:1}],paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:10},{method:'Yappy',amount:12}]}),'s',true);
+ const service=f.get('services/s');assert.equal(service.financials.servicePrice,20);assert.equal(service.financials.totalPrice,22);assert.equal(service.financials.washerEarnings,5);assert.equal(f.get('serviceCatalog/wash').price,15);assert.equal(service.serviceItems[0].basePrice,15);
+ await f.api.saveCatalogService('wash',{name:'Lavado nuevo',price:30,active:false});
+ await f.api.saveService(f.input({servicePrice:999,serviceItems:[{catalogId:'wash',unitPrice:11},{catalogId:'wax',unitPrice:8}],cart:[{productId:'p1',quantity:1}],paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:10},{method:'Yappy',amount:11}]}),'s',false);
+ assert.equal(f.get('services/s').serviceItems[0].name,'Lavado');assert.equal(f.get('services/s').serviceItems[0].basePrice,15);assert.equal(f.get('services/s').financials.totalPrice,21);assert.equal(f.get('serviceCatalog/wash').price,30);
+ await assert.rejects(f.api.saveService(f.input({serviceItems:[{catalogId:'wash',unitPrice:11}]}),'new',true),/activo/);
+});
+test('pending catalog services collect once and invalid selection or price never touches stock or cash',async()=>{
+ const f=fixture();await f.api.saveCatalogService('wash',{name:'Lavado',price:15,active:true});
+ await f.api.saveService(f.input({paymentStatus:'pending',serviceItems:[{catalogId:'wash',unitPrice:12}]}),'s',true);assert.equal(f.get('services/s').financials.totalPrice,12);
+ await f.api.openCash(10,'c');await f.api.saveService(f.input({serviceItems:[{catalogId:'wash',unitPrice:12}],paymentMethod:'Mixto',payments:[{method:'Efectivo',amount:6},{method:'Yappy',amount:6}]}),'s',false);assert.equal(f.get('cashSessions/c').receipts,12);
+ for(const serviceItems of [[{catalogId:'missing',unitPrice:1}],[{catalogId:'wash',unitPrice:-1}],[{catalogId:'wash',unitPrice:1},{catalogId:'wash',unitPrice:1}]])await assert.rejects(f.api.saveService(f.input({serviceItems,cart:[{productId:'p1',quantity:1}]}),'bad',true));
+ assert.equal(f.get('products/p1').stock,10);assert.equal(f.get('cashSessions/c').receipts,12);await f.api.closeCash('c',16,'');await f.api.openCash(0,'new');await assert.rejects(f.api.saveService(f.input({serviceItems:[{catalogId:'wash',unitPrice:13}]}),'s',false),/cerrada/);
+});

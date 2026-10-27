@@ -19,6 +19,7 @@ export const menuItems = [
   { name: "Caja", href: "/cash", icon: Wallet },
   { name: "Movimientos", href: "/movements", icon: History },
   { name: "Sobres con dinero", href: "/envelopes", icon: Mail },
+  { name: "Catálogo de servicios", href: "/catalog", icon: Settings },
   { name: "Inventario", href: "/inventory", icon: Package },
   { name: "Venta de productos", href: "/sales", icon: ShoppingCart },
   { name: "Configuración", href: "/settings", icon: Settings },
@@ -44,6 +45,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.4.5 - Vales y sobres";
+export const versionSoft = "v1.5.0 - Vales y sobres";
 
 

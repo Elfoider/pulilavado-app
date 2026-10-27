@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CartItem, Product, ProductLine, money } from "@/lib/operations/model";
 import { useCollection } from "@/lib/useCollection";
 
@@ -9,12 +9,14 @@ export default function ProductCart({
   previous = [],
   servicePrice,
   tipAmount = 0,
+  onTotalChange,
 }: {
   value: CartItem[];
   onChange: (cart: CartItem[]) => void;
   previous?: ProductLine[];
   servicePrice?: number;
   tipAmount?: number;
+  onTotalChange?: (total:number)=>void;
 }) {
   const { data: products, error, loading } = useCollection<Product>("products");
   const [search, setSearch] = useState("");
@@ -37,6 +39,7 @@ export default function ProductCart({
       0,
     ),
   );
+  useEffect(()=>{onTotalChange?.(total);},[total,onTotalChange]);
   return (
     <section className="rounded-xl border border-cyan-200 bg-cyan-50/60 p-4 space-y-3">
       <h3 className="font-bold text-gray-800">

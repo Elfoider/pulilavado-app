@@ -45,12 +45,14 @@ export interface ServiceDocument {
   };
   status?: string;
   cashSessionId?: string | null;
+  serviceItems?: import("@/lib/operations/model").ServiceLine[];
   products?: import("@/lib/operations/model").ProductLine[];
   financials: {
     servicePrice?: number;
     productsTotal?: number;
     totalPrice: number;
-    paymentMethod: PaymentMethod;
+    paymentMethod: PaymentMethod | "Mixto";
+    payments?: import("@/lib/operations/model").PaymentPart[];
     commissionRate: number;
     washerEarnings: number;
     businessEarnings: number;

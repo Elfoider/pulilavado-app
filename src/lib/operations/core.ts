@@ -1,4 +1,5 @@
 import {
+  PaymentPart, paymentParts, ServiceSelection, ServiceLine,
   Atomic,
   AtomicTx,
   Data,
@@ -169,14 +170,14 @@ export function createOperations(
     const total = Number(fin.totalPrice || 0),
       tip = Number(fin.tipAmount || 0);
     return [
-      {
-        amount: sign * total,
-        method: method(String(fin.paymentMethod)),
+      ...paymentParts(total, String(fin.paymentMethod), fin.payments as PaymentPart[] | undefined).map(part => ({
+        amount: sign * part.amount,
+        method: part.method,
         kind,
         referenceId,
         description: "Cobro de servicio y productos",
-        receipts: sign * total,
-      },
+        receipts: sign * part.amount,
+      })),
       ...(tip
         ? [
             {
@@ -414,8 +415,16 @@ export function createOperations(
         });
       });
     },
-    async sell(cart: CartItem[], paymentMethod: string, requestId: string) {
-      const pm = method(paymentMethod);
+    async saveCatalogService(catalogId: string, input: {name: string; price: number; active: boolean}) {
+      if (!catalogId || catalogId.includes("/")) throw new Error("Referencia de servicio inválida.");
+      if (!input.name.trim() || input.name.trim().length > 120) throw new Error("Indique un nombre de hasta 120 caracteres.");
+      const price = nonnegative(input.price, "Precio del catálogo");
+      return atomic(async tx => {
+        const old = await tx.get(`serviceCatalog/${catalogId}`);
+        tx.set(`serviceCatalog/${catalogId}`, {name: input.name.trim(), price, active: !!input.active, updatedAt:stamp(), ...(!old ? {createdAt:stamp()} : {})}, true);
+      });
+    },
+    async sell(cart: CartItem[], payment: string | PaymentPart[], requestId: string) {
       if (!cart.length) throw new Error("Agregue al menos un producto.");
       return atomic(async (tx) => {
         const existing = await tx.get(`sales/${requestId}`);
@@ -424,21 +433,21 @@ export function createOperations(
         const plan = await productPlan(tx, cart);
         if (plan.total <= 0)
           throw new Error("El total de venta debe ser positivo.");
+        const payments = paymentParts(plan.total, typeof payment === "string" ? payment : "Mixto", typeof payment === "string" ? undefined : payment);
         writeStock(tx, plan, requestId, "sale");
-        ledger(tx, session, [
-          {
-            amount: plan.total,
-            method: pm,
+        ledger(tx, session, payments.map(part => ({
+            amount: part.amount,
+            method: part.method,
             kind: "sale",
             referenceId: requestId,
             description: "Venta individual de productos",
-            receipts: plan.total,
-          },
-        ]);
+            receipts: part.amount,
+          })));
         tx.set(`sales/${requestId}`, {
           lines: plan.lines,
           total: plan.total,
-          paymentMethod: pm,
+          paymentMethod: payments.length === 1 ? payments[0].method : "Mixto",
+          payments,
           cashSessionId: session.id,
           status: "paid",
           createdAt: stamp(),
@@ -459,16 +468,14 @@ export function createOperations(
           );
         const plan = await productPlan(tx, [], sale.lines as ProductLine[]);
         writeStock(tx, plan, saleId, "sale_return");
-        ledger(tx, session, [
-          {
-            amount: -Number(sale.total),
-            method: method(String(sale.paymentMethod)),
+        ledger(tx, session, paymentParts(Number(sale.total), String(sale.paymentMethod), sale.payments as PaymentPart[] | undefined).map(part => ({
+            amount: -part.amount,
+            method: part.method,
             kind: "sale_refund",
             referenceId: saleId,
             description: reason.trim(),
-            receipts: -Number(sale.total),
-          },
-        ]);
+            receipts: -part.amount,
+          })));
         tx.set(
           `sales/${saleId}`,
           {
@@ -489,6 +496,8 @@ export function createOperations(
         servicePrice: number;
         paymentStatus: string;
         paymentMethod: string;
+        payments?: PaymentPart[];
+        serviceItems?: ServiceSelection[];
         tipAmount: number;
         tipMethod: string;
         cart: CartItem[];
@@ -496,7 +505,7 @@ export function createOperations(
       serviceId: string,
       create: boolean,
     ) {
-      const servicePrice = nonnegative(input.servicePrice, "Precio del lavado");
+      const manualServicePrice = nonnegative(input.servicePrice, "Precio del lavado");
       const paid = input.paymentStatus === "paid";
       if (!["paid", "pending"].includes(input.paymentStatus))
         throw new Error("Estado de pago inválido.");
@@ -527,14 +536,27 @@ export function createOperations(
           input.cart,
           (old?.products ?? []) as ProductLine[],
         );
+        const serviceItems: ServiceLine[] = [];
+        const selections = input.serviceItems ?? (old?.serviceItems ?? []) as ServiceLine[];
+        if (!Array.isArray(selections) || selections.length > 40 || new Set(selections.map(line=>line.catalogId)).size !== selections.length) throw new Error("Servicios del catálogo inválidos o duplicados.");
+        for (const selection of selections) {
+          if (!selection.catalogId || selection.catalogId.includes("/")) throw new Error("Referencia de catálogo inválida.");
+          const previous = ((old?.serviceItems ?? []) as ServiceLine[]).find(line=>line.catalogId === selection.catalogId);
+          const catalog: Data | undefined = previous ? {...previous} : await tx.get(`serviceCatalog/${selection.catalogId}`);
+          if (!catalog || (!previous && !catalog.active)) throw new Error("Seleccione un servicio activo del catálogo.");
+          serviceItems.push({catalogId:selection.catalogId,name:String(catalog.name),basePrice:nonnegative(Number(previous?.basePrice ?? catalog.price),"Precio base"),unitPrice:nonnegative(selection.unitPrice,"Precio del servicio")});
+        }
+        const servicePrice = serviceItems.length ? money(serviceItems.reduce((sum,line)=>sum+line.unitPrice,0)) : manualServicePrice;
         const total = money(servicePrice + plan.total);
+        const payments = paid ? paymentParts(total, input.paymentMethod, input.payments) : [];
         if (paid && total <= 0)
           throw new Error("Ingrese un precio positivo para cobrar.");
         const fin = {
           totalPrice: total,
           servicePrice,
           productsTotal: plan.total,
-          paymentMethod: paid ? method(input.paymentMethod) : "Pendiente",
+          paymentMethod: paid ? payments.length === 1 ? payments[0].method : "Mixto" : "Pendiente",
+          payments,
           tipAmount: tip,
           tipMethod: tip ? method(input.tipMethod) : null,
           commissionRate: rate,
@@ -546,7 +568,7 @@ export function createOperations(
           !old ||
           oldPaid !== paid ||
           Number(oldFin.totalPrice || 0) !== total ||
-          oldFin.paymentMethod !== fin.paymentMethod ||
+          (oldPaid && paid && JSON.stringify(paymentParts(Number(oldFin.totalPrice || 0), String(oldFin.paymentMethod), oldFin.payments as PaymentPart[] | undefined)) !== JSON.stringify(payments)) ||
           Number(oldFin.tipAmount || 0) !== tip ||
           (tip > 0 && oldFin.tipMethod !== fin.tipMethod);
         let session: CashSession | undefined;
@@ -566,7 +588,8 @@ export function createOperations(
           old &&
           (old.washerId !== input.washerId ||
             Number(oldFin.servicePrice ?? oldFin.totalPrice) !== servicePrice ||
-            JSON.stringify(old.products ?? []) !== JSON.stringify(plan.lines));
+            JSON.stringify(old.products ?? []) !== JSON.stringify(plan.lines) ||
+            JSON.stringify(old.serviceItems ?? []) !== JSON.stringify(serviceItems));
         if (oldPaid && allocationChanged) {
           if (!old?.cashSessionId)
             throw new Error(
@@ -597,6 +620,7 @@ export function createOperations(
             washerId: input.washerId,
             paymentStatus: input.paymentStatus,
             products: plan.lines,
+            serviceItems,
             financials:
               old && oldPaid && !allocationChanged && !changed ? oldFin : fin,
             washerName: washer.name,

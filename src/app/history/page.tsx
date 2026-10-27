@@ -1,4 +1,5 @@
 "use client";
+import { paymentParts } from "@/lib/operations/model";
 
 import { useState, useEffect } from "react";
 import { db } from "@/lib/firebase";
@@ -106,20 +107,11 @@ export default function HistoryPage() {
         console.log(
           `Servicio ID: ${svc.id}, Monto: ${total}, Método: ${svc.financials.paymentMethod}`,
         );
-        const method = svc.financials.paymentMethod;
-
-        if (method == "Efectivo") {
-          cCash++;
-          aCash += total;
-        } else if (method == "Yappy") {
-          cYappy++;
-          aYappy += total;
-        } else if (method == "Tarjeta") {
-          cCard++;
-          aCard += total;
-        } else if (method == "Transferencia") {
-          cACH++;
-          aACH += total;
+        for (const part of paymentParts(total, svc.financials.paymentMethod, svc.financials.payments)) {
+          if (part.method === "Efectivo") {cCash++;aCash+=part.amount;}
+          else if (part.method === "Yappy") {cYappy++;aYappy+=part.amount;}
+          else if (part.method === "Tarjeta") {cCard++;aCard+=part.amount;}
+          else {cACH++;aACH+=part.amount;}
         }
       });
 
