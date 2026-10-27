@@ -1,4 +1,6 @@
 "use client";
+import HelpTip from "./HelpTip";
+import SectionLink from "./SectionLink";
 import { useState } from "react";
 import { enqueueSnackbar } from "notistack";
 import PaymentEditor from "./PaymentEditor";
@@ -56,16 +58,14 @@ export default function SalesPanel() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-black">Venta de productos</h1>
-      <p className="text-gray-600">
+      <HelpTip label="Venta de productos">
         Venta individual sin registrar un vehículo. Los productos también están
         disponibles en Nuevo servicio.
-      </p>
+      </HelpTip>
       {!open && (
         <p className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
           Abra la caja para realizar una venta.{" "}
-          <a className="text-cyan-700 underline" href="/cash">
-            Ir a caja
-          </a>
+          <SectionLink href="/cash">Abrir Caja</SectionLink>
         </p>
       )}
       {error && (

@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import HelpTip from "./HelpTip";
+import SectionLink from "./SectionLink";
+import { ArrowUpRight, Banknote, Coins, HandCoins, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { enqueueSnackbar } from "notistack";
 import { useCollection } from "@/lib/useCollection";
 import {
@@ -35,7 +37,7 @@ export default function CashPanel() {
   } = useCollection<Data & { id: string }>("cashSessions", "openedAt", 100);
   const [selectedId, setSelectedId] = useState(""),
     [busy, setBusy] = useState(false);
-  const [opening, setOpening] = useState("0"),
+  const [opening, setOpening] = useState(""),
     [counted, setCounted] = useState(""),
     [notes, setNotes] = useState("");
   const washers = useCollection<Data & {id:string}>("washers");
@@ -72,7 +74,7 @@ export default function CashPanel() {
     }
   }
   return (
-    <div className="space-y-6">
+    <div className="cash-panel space-y-6">
       <div className="flex flex-wrap justify-between gap-3">
         <div>
           <h1 className="text-3xl font-black">Caja</h1>
@@ -80,10 +82,7 @@ export default function CashPanel() {
             Apertura, cobros, gastos, vales, arqueo y cierre.
           </p>
         </div>
-        <Link href="/envelopes" className="text-emerald-700 font-bold self-center">Sobres y resumen semanal →</Link>
-        <Link href="/sales" className="text-cyan-700 font-bold self-center">
-          Vender productos →
-        </Link>
+        <div className="flex flex-wrap gap-2 self-center"><SectionLink href="/envelopes">Sobres</SectionLink><SectionLink href="/sales">Vender productos</SectionLink><SectionLink href="/movements">Movimientos</SectionLink><SectionLink href="/reports">Reportes</SectionLink></div>
       </div>
       {error && (
         <p role="alert" className="text-red-700">
@@ -102,8 +101,8 @@ export default function CashPanel() {
               void run(() => operations.closeLegacyCash(s.id, Number(values.get("counted")), String(values.get("notes"))), true);
             }}>
               <p className="text-sm font-bold">Revise los cobros anteriores y cuente el efectivo antes de cerrar. El monto contado se guarda como constancia; no se trasladará automáticamente a una jornada nueva.</p>
-              <label className="block text-sm">Efectivo contado ($)<input name="counted" required type="number" min="0" step="0.01" className="block border rounded-lg p-2 w-full" /></label>
-              <label className="block text-sm">Responsable de la revisión y observación<textarea name="notes" required className="block border rounded-lg p-2 w-full" /></label>
+              <label className="block text-sm">Efectivo contado ($)<input name="counted" required type="number" min="0" step="0.01" className="block border border-slate-200 rounded-lg p-2 w-full" /></label>
+              <label className="block text-sm">Responsable de la revisión y observación<textarea name="notes" required className="block border border-slate-200 rounded-lg p-2 w-full" /></label>
               <label className="block text-sm"><input type="checkbox" required /> Revisé esta caja y confirmo su cierre para iniciar una jornada nueva.</label>
               <button disabled={busy} className="bg-gray-800 text-white px-5 py-2 rounded-lg disabled:opacity-50">Cerrar caja anterior</button>
             </form>
@@ -140,7 +139,7 @@ export default function CashPanel() {
       )}
       {!open && !loading && !error && !blocked && (
         <form
-          className="bg-white border rounded-2xl p-5 max-w-lg space-y-3"
+          className="bg-white border border-cyan-100 rounded-2xl p-6 max-w-lg space-y-4 shadow-sm"
           onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
@@ -152,7 +151,7 @@ export default function CashPanel() {
             });
           }}
         >
-          <h2 className="text-xl font-bold">Abrir caja</h2>
+          <div className="flex items-center gap-2 text-cyan-900"><Wallet className="h-5 w-5"/><h2 className="text-xl font-bold">Comenzar jornada</h2><HelpTip label="Fondo inicial">Registre el efectivo físico con el que empieza. No se cuenta como venta. Puede indicar 0 si no hay fondo.</HelpTip></div>
           <label className="block text-sm">
             Fondo inicial en efectivo ($)
             <input
@@ -165,7 +164,7 @@ export default function CashPanel() {
                 setOpening(e.target.value);
                 setOpeningId(newId());
               }}
-              className="block border rounded-lg p-2 w-full"
+              className="block border border-slate-200 rounded-lg p-2 w-full"
             />
           </label>
           <button
@@ -176,7 +175,79 @@ export default function CashPanel() {
           </button>
         </form>
       )}
-      {open && !blocked && (
+      <div className="flex items-center gap-3 flex-wrap">
+        <label htmlFor="cash-history" className="font-bold">
+          Historial de cajas
+        </label>
+        <select
+          id="cash-history"
+          value={session?.id ?? ""}
+          onChange={(e) => {
+            setSelectedId(e.target.value);
+            setCounted("");
+            setNotes("");
+          }}
+          className="border border-slate-200 rounded-lg p-2 bg-white max-w-full"
+        >
+          {sessions.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.openedAt
+                ? new Date(s.openedAt.seconds * 1000).toLocaleString()
+                : "..."}{" "}
+              · {s.status === "open" ? "Abierta" : "Cerrada"}
+            </option>
+          ))}
+        </select>
+      </div>
+      <HelpTip label="Consultar otra jornada">Se muestran las 100 cajas más recientes. Use Movimientos o Reportes para consultar por fechas. Los cobros históricos conservan sus datos.</HelpTip>
+      {session && (
+        <>
+          <section className="bg-white border border-cyan-100 rounded-2xl p-5 sm:p-6 space-y-5 shadow-sm">
+            <div className="flex justify-between">
+              <h2 className="text-xl font-bold">
+                {session.status === "open" ? "Caja abierta" : "Cierre de caja"}
+              </h2>
+              <button className="text-cyan-700" onClick={() => window.print()}>
+                Imprimir
+              </button>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-cyan-950 p-5 text-white"><div className="flex items-center justify-between gap-2 text-cyan-100"><p className="text-xs font-bold uppercase tracking-wide">Efectivo esperado</p><Banknote className="h-5 w-5"/></div><p className="text-4xl font-black mt-3">${session.balances.Efectivo.toFixed(2)}</p><p className="text-xs text-cyan-100 mt-2">Incluye el fondo inicial</p></div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5"><div className="flex justify-between gap-2 text-emerald-800"><p className="text-xs font-bold uppercase tracking-wide">Efectivo a guardar de la jornada</p><ShieldCheck className="h-5 w-5 shrink-0"/></div><p className="text-4xl font-black text-emerald-900 mt-3">${(session.balances.Efectivo-session.openingAmount).toFixed(2)}</p><div className="mt-2"><HelpTip label="Cómo se calcula">Efectivo esperado menos fondo inicial. Ya descuenta gastos, retiros, vales y lo trasladado a sobres.</HelpTip></div></div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{METHODS.filter(method=>method!=="Efectivo").map(method=><div key={method} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"><p className="text-xs font-bold text-slate-500">{method}</p><p className="text-xl font-bold text-slate-800 mt-1">${session.balances[method].toFixed(2)}</p></div>)}</div>
+            <div className="flex flex-wrap gap-6 text-sm">
+              <p>
+                Fondo inicial: <b>${session.openingAmount.toFixed(2)}</b>
+              </p>
+              <p>
+                Cobros netos (servicios y productos):{" "}
+                <b>${session.receipts.toFixed(2)}</b>
+              </p>
+              <p>
+                Propinas netas: <b>${session.tips.toFixed(2)}</b>
+              </p>
+              <p>
+                Gastos: <b>${session.expenses.toFixed(2)}</b>
+              </p>
+            </div>
+            <HelpTip label="Propinas y comisiones">
+              Las propinas se incluyen en el saldo del método recibido y se
+              muestran separadas de las ventas. Para entregarlas al lavador
+              registre un retiro con su nombre. La comisión se registra en el
+              servicio; solo afecta el efectivo al pagarla como retiro.
+            </HelpTip>
+            {session.status === "closed" && (
+              <div className="border-t pt-4">
+                <p>
+                  Efectivo contado: <b>${session.countedAmount?.toFixed(2)}</b>{" "}
+                  · Diferencia: <b>${session.difference?.toFixed(2)}</b>
+                </p>
+                <p className="text-sm text-gray-600">{session.notes}</p>
+              </div>
+            )}
+          </section>
+      {session.status === "open" && open?.id === session.id && !blocked && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -193,9 +264,10 @@ export default function CashPanel() {
               setMove({ ...move, amount: "", description: "" });
             });
           }}
-          className="bg-white border rounded-2xl p-5 space-y-3"
+          className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
         >
-          <h2 className="text-xl font-bold">Registrar gasto o movimiento</h2>
+          <div className="flex items-center justify-between gap-2"><h2 className="text-xl font-bold text-slate-800">Registrar movimiento</h2><HelpTip label="Tipos de movimiento">Gasto: pagos del negocio. Retiro: entrega o salida de dinero. Vale: adelanto de nómina vinculado al lavador. Ingreso: fondos adicionales que no son ventas.</HelpTip></div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">{([{kind:"expense",label:"Gasto",icon:ArrowUpRight},{kind:"withdrawal",label:"Retiro / pago",icon:HandCoins},{kind:"advance",label:"Vale",icon:Coins},{kind:"income",label:"Ingreso",icon:Plus}] as const).map(action=><button key={action.kind} type="button" aria-pressed={move.kind===action.kind} onClick={()=>{setMoveId(newId());setMove({...move,kind:action.kind,method:action.kind==="advance"?"Efectivo":move.method});}} className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-3 text-sm font-bold transition ${move.kind===action.kind?"border-cyan-600 bg-cyan-700 text-white shadow-sm":"border-slate-200 bg-slate-50 text-slate-600 hover:bg-cyan-50"}`}><action.icon className="h-4 w-4"/>{action.label}</button>)}</div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <select
               aria-label="Tipo de movimiento de caja"
@@ -204,7 +276,7 @@ export default function CashPanel() {
                 setMoveId(newId());
                 setMove({ ...move, kind: e.target.value as typeof move.kind, method: e.target.value === "advance" ? "Efectivo" : move.method });
               }}
-              className="border rounded-lg p-2"
+              className="border border-slate-200 rounded-lg p-2"
             >
               <option value="expense">Gasto</option>
               <option value="withdrawal">Retiro / pago a lavador</option>
@@ -219,7 +291,7 @@ export default function CashPanel() {
                 setMoveId(newId());
                 setMove({ ...move, method: e.target.value });
               }}
-              className="border rounded-lg p-2"
+              className="border border-slate-200 rounded-lg p-2"
             >
               {METHODS.map((m) => (
                 <option key={m}>{m}</option>
@@ -237,7 +309,7 @@ export default function CashPanel() {
                 setMoveId(newId());
                 setMove({ ...move, amount: e.target.value });
               }}
-              className="border rounded-lg p-2"
+              className="border border-slate-200 rounded-lg p-2"
             />
             <input
               required
@@ -248,101 +320,21 @@ export default function CashPanel() {
                 setMoveId(newId());
                 setMove({ ...move, description: e.target.value });
               }}
-              className="border rounded-lg p-2"
+              className="border border-slate-200 rounded-lg p-2"
             />
           </div>
-          {move.kind === "advance" && <label className="block text-sm">Lavador del vale<select required value={washerId} onChange={e => {setWasherId(e.target.value);setMoveId(newId());}} aria-label="Lavador del vale" className="block border rounded-lg p-2 w-full max-w-md"><option value="">Seleccione un lavador</option>{washers.data.filter(w=>w.active!==false).map(w=><option key={w.id} value={w.id}>{String(w.name ?? "Sin nombre")}</option>)}</select><span className="text-gray-500">Se entrega en efectivo y se descuenta de sus comisiones en el reporte del período.</span>{washers.error && <span role="alert" className="text-red-700">{washers.error}</span>}</label>}
+          {move.kind === "advance" && <label className="block text-sm">Lavador del vale<select required value={washerId} onChange={e => {setWasherId(e.target.value);setMoveId(newId());}} aria-label="Lavador del vale" className="block border border-slate-200 rounded-lg p-2 w-full max-w-md"><option value="">Seleccione un lavador</option>{washers.data.filter(w=>w.active!==false).map(w=><option key={w.id} value={w.id}>{String(w.name ?? "Sin nombre")}</option>)}</select><span className="block text-xs text-cyan-700 mt-1">Se descontará de la nómina de este lavador.</span>{washers.error && <span role="alert" className="text-red-700">{washers.error}</span>}</label>}
           <button
             disabled={busy}
-            className="bg-gray-800 text-white px-5 py-2 rounded-lg disabled:opacity-50"
+            className="bg-cyan-700 text-white px-6 py-3 rounded-xl font-bold disabled:opacity-50"
           >
             Guardar movimiento
           </button>
         </form>
       )}
-      <div className="flex items-center gap-3 flex-wrap">
-        <label htmlFor="cash-history" className="font-bold">
-          Historial de cajas
-        </label>
-        <select
-          id="cash-history"
-          value={session?.id ?? ""}
-          onChange={(e) => {
-            setSelectedId(e.target.value);
-            setCounted("");
-            setNotes("");
-          }}
-          className="border rounded-lg p-2 bg-white max-w-full"
-        >
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.openedAt
-                ? new Date(s.openedAt.seconds * 1000).toLocaleString()
-                : "..."}{" "}
-              · {s.status === "open" ? "Abierta" : "Cerrada"}
-            </option>
-          ))}
-        </select>
-      </div>
-      <p className="text-sm text-gray-500">
-        Las 100 cajas más recientes. Los cobros anteriores a esta actualización
-        permanecen en Historial y Reportes.
-      </p>
-      {session && (
-        <>
-          <section className="bg-white border rounded-2xl p-5 space-y-4">
-            <div className="flex justify-between">
-              <h2 className="text-xl font-bold">
-                {session.status === "open" ? "Caja abierta" : "Cierre de caja"}
-              </h2>
-              <button className="text-cyan-700" onClick={() => window.print()}>
-                Imprimir
-              </button>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {METHODS.map((m) => (
-                <div className="border rounded-xl p-4 bg-gray-50" key={m}>
-                  <p className="text-sm text-gray-500">
-                    {m === "Efectivo" ? "Efectivo esperado" : m}
-                  </p>
-                  <p className="text-2xl font-black">
-                    ${(session.balances[m] || 0).toFixed(2)}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-6 text-sm">
-              <p>
-                Fondo inicial: <b>${session.openingAmount.toFixed(2)}</b>
-              </p>
-              <p>
-                Cobros netos (servicios y productos):{" "}
-                <b>${session.receipts.toFixed(2)}</b>
-              </p>
-              <p>
-                Propinas netas: <b>${session.tips.toFixed(2)}</b>
-              </p>
-              <p>
-                Gastos: <b>${session.expenses.toFixed(2)}</b>
-              </p>
-            </div>
-            <p className="text-xs text-gray-500">
-              Las propinas se incluyen en el saldo del método recibido y se
-              muestran separadas de las ventas. Para entregarlas al lavador
-              registre un retiro con su nombre. La comisión se registra en el
-              servicio; solo afecta el efectivo al pagarla como retiro.
-            </p>
-            {session.status === "closed" && (
-              <div className="border-t pt-4">
-                <p>
-                  Efectivo contado: <b>${session.countedAmount?.toFixed(2)}</b>{" "}
-                  · Diferencia: <b>${session.difference?.toFixed(2)}</b>
-                </p>
-                <p className="text-sm text-gray-600">{session.notes}</p>
-              </div>
-            )}
-          </section>
+
           {session.status === "open" && !blocked && (
+            <details className="rounded-2xl border border-slate-200 bg-white shadow-sm"><summary className="flex cursor-pointer items-center gap-2 rounded-2xl p-5 font-bold text-slate-700 list-none"><ShieldCheck className="h-5 w-5 text-cyan-700"/>Arqueo y cierre<span className="ml-auto text-xs font-normal text-slate-500">Abrir / cerrar</span></summary>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -356,10 +348,10 @@ export default function CashPanel() {
                   operations.closeCash(session.id, Number(counted), notes),
                 );
               }}
-              className="bg-white border rounded-2xl p-5 space-y-3"
+              className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
             >
-              <h2 className="text-xl font-bold">Arqueo y cierre</h2>
-              {session.balances.Efectivo > session.openingAmount && <p className="text-sm text-gray-500">Si va a guardar el efectivo de la jornada, regístrelo en <Link href="/envelopes" className="underline text-emerald-700">Sobres con dinero</Link> antes de cerrar esta caja.</p>}
+              <h2 className="text-lg font-bold">Contar efectivo y cerrar</h2>
+              {session.balances.Efectivo > session.openingAmount && <div className="flex flex-wrap items-center gap-2"><HelpTip label="Antes de cerrar">Si va a guardar el efectivo de la jornada en un sobre, registre ese traslado antes de cerrar esta caja.</HelpTip><SectionLink href="/envelopes">Guardar en sobre</SectionLink></div>}
               <label className="block text-sm">
                 Efectivo físico contado ($)
                 <input
@@ -369,7 +361,7 @@ export default function CashPanel() {
                   step="0.01"
                   value={counted}
                   onChange={(e) => setCounted(e.target.value)}
-                  className="block border rounded-lg p-2 max-w-xs"
+                  className="block border border-slate-200 rounded-lg p-2 max-w-xs"
                 />
               </label>
               <p className="text-sm">
@@ -383,7 +375,7 @@ export default function CashPanel() {
                 placeholder="Observaciones del cierre"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="border rounded-lg p-2 w-full"
+                className="border border-slate-200 rounded-lg p-2 w-full"
               />
               <button
                 disabled={busy || counted === ""}
@@ -391,7 +383,7 @@ export default function CashPanel() {
               >
                 Cerrar caja
               </button>
-            </form>
+            </form></details>
           )}
           <CashMovements key={session.id} sessionId={session.id} />
         </>
@@ -437,7 +429,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
     }
   }
   return (
-    <section className="bg-white border rounded-2xl p-5">
+    <section className="bg-white border border-slate-200 rounded-2xl p-5">
       <h2 className="text-xl font-bold mb-3">Movimientos de esta caja</h2>
       {error && (
         <p role="alert" className="text-red-700">
@@ -493,10 +485,10 @@ function CashMovements({ sessionId }: { sessionId: string }) {
               : "Ver movimientos"}
         </button>
       )}
-      <p className="text-xs text-gray-500 mt-2">
+      <HelpTip label="Sobre este historial">
         Los saldos antes y después se registran desde esta versión. Los movimientos anteriores conservan sus datos. Los movimientos se cargan en grupos de 100. Vuelva a seleccionar la caja
         para actualizar el detalle.
-      </p>
+      </HelpTip>
     </section>
   );
 }

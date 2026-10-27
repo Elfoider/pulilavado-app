@@ -1,4 +1,6 @@
 "use client";
+import NumberInput from "./NumberInput";
+import HelpTip from "./HelpTip";
 import { useEffect, useState } from "react";
 import { CartItem, Product, ProductLine, money } from "@/lib/operations/model";
 import { useCollection } from "@/lib/useCollection";
@@ -47,11 +49,11 @@ export default function ProductCart({
           ? "Productos de la venta"
           : "Productos adicionales"}
       </h3>
-      <p className="text-xs text-gray-600">
+      <HelpTip label="Productos y comisión">
         {servicePrice === undefined
           ? "La venta actualiza inventario y caja al mismo tiempo."
           : "Se incluyen en el mismo cobro. La comisión se aplica solo al lavado."}
-      </p>
+      </HelpTip>
       {error && (
         <p role="alert" className="text-red-600 text-sm">
           {error}
@@ -113,17 +115,16 @@ export default function ProductCart({
                 {p?.stock ?? "—"}
               </p>
             </div>
-            <input
+            <NumberInput
               aria-label={`Cantidad de ${p?.name ?? "producto"}`}
-              type="number"
               min="1"
               step="1"
               value={l.quantity}
-              onChange={(e) =>
+              onValueChange={(quantity) =>
                 onChange(
                   value.map((i) =>
                     i.productId === l.productId
-                      ? { ...i, quantity: Number(e.target.value) }
+                      ? { ...i, quantity }
                       : i,
                   ),
                 )

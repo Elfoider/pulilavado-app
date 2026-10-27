@@ -1,4 +1,5 @@
 "use client"
+import HelpTip from "./HelpTip";
 
 import { useState, useEffect } from 'react';
 import { db } from '@/lib/firebase';
@@ -74,9 +75,9 @@ export default function SettingsForm() {
             />
             <span className="ml-2 text-gray-500 font-bold">%</span>
           </div>
-          <p className="text-xs text-gray-500 mt-1">
+          <HelpTip label="Comisión por defecto">
             Este porcentaje se aplica a nuevos servicios de lavadores sin comisión individual. No modifica servicios anteriores.
-          </p>
+          </HelpTip>
         </div>
 
         <button

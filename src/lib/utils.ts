@@ -45,6 +45,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.5.0 - Vales y sobres";
+export const versionSoft = "v1.5.1 - Caja y ayudas";
 
 

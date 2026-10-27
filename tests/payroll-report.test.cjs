@@ -64,6 +64,11 @@ function harness(services = [], cash = { session: null, loading: false, error: "
     };
     if (name === "notistack") return { enqueueSnackbar: (...args) => notices.push(args) };
     if (name === "@/lib/utils") return { formatMoney: (value) => `$${value.toFixed(2)}` };
+    if (name.startsWith("./") && fs.existsSync(`src/components/${name.slice(2)}.tsx`)) {
+      const child={exports:{}};
+      const source=ts.transpileModule(fs.readFileSync(`src/components/${name.slice(2)}.tsx`,"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true,target:ts.ScriptTarget.ES2022}}).outputText;
+      new Function("require","module","exports",source)(localRequire,child,child.exports);return child.exports;
+    }
     return require(name);
   };
   const code = ts.transpileModule(fs.readFileSync("src/components/ReportsPanel.tsx", "utf8"), {

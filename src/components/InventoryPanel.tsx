@@ -1,4 +1,5 @@
 "use client";
+import NumberInput from "./NumberInput";
 import { useState } from "react";
 import { useCollection } from "@/lib/useCollection";
 import { Product } from "@/lib/operations/model";
@@ -113,14 +114,13 @@ export default function InventoryPanel() {
           {(["cost", "price", "minimum"] as const).map((k, i) => (
             <label key={k} className="text-sm">
               {["Costo ($)", "Precio de venta ($)", "Stock mínimo"][i]}
-              <input
+              <NumberInput
                 required
-                type="number"
                 min="0"
                 step={k === "minimum" ? "1" : "0.01"}
                 value={form[k]}
-                onChange={(e) =>
-                  setForm({ ...form, [k]: Number(e.target.value) })
+                onValueChange={(value) =>
+                  setForm({ ...form, [k]: value })
                 }
                 className="block w-full border p-2 rounded-lg"
               />

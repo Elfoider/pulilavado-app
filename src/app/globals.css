@@ -31,3 +31,17 @@
 /* Hover Effects (Opcionales para botones) */
 .hover-bg-espuma-blue:hover { background-color: #0096B4; /* Un poco más oscuro */ }
 .hover-bg-espuma-red:hover { background-color: #B51F1F; }
+.help-tip summary::-webkit-details-marker { display: none; }
+.help-tip[open] > summary { background: #ecfeff; color: #155e75; }
+@media print { .help-tip { display: none; } }
+.cash-panel input:not([type="checkbox"]), .cash-panel select, .cash-panel textarea {
+  border: 1px solid #dbe5ec;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.8rem;
+  background-color: #fff;
+  color: #1e293b;
+}
+.cash-panel input:focus-visible, .cash-panel select:focus-visible, .cash-panel textarea:focus-visible {
+  outline: 2px solid #0891b2;
+  outline-offset: 2px;
+}

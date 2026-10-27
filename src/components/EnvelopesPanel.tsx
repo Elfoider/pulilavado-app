@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import SectionLink from "./SectionLink";
+import HelpTip from "./HelpTip";
 import { enqueueSnackbar } from "notistack";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -124,9 +125,7 @@ export default function EnvelopesPanel() {
             Control de efectivo por día. Semanas de martes a lunes.
           </p>
         </div>
-        <Link href="/cash" className="text-cyan-700 font-bold">
-          Ir a Caja →
-        </Link>
+        <SectionLink href="/cash">Caja</SectionLink>
       </div>
       <div className="flex flex-wrap gap-3 items-center">
         <button
@@ -253,10 +252,10 @@ export default function EnvelopesPanel() {
         <h2 className="text-xl font-bold">
           Guardar efectivo de hoy en su sobre
         </h2>
-        <p className="text-sm text-gray-500">
+        <HelpTip label="Guardar efectivo">
           Se descuenta de Caja y se deposita en el sobre del {today},
           conservando el fondo inicial.
-        </p>
+        </HelpTip>
         <p>
           Efectivo a guardar disponible:{" "}
           <b>

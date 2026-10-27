@@ -24,6 +24,7 @@ import {
   Coins,
   Palette,
 } from "lucide-react";
+import HelpTip from "./HelpTip";
 import PaymentEditor from "./PaymentEditor";
 import ServiceCatalogPicker from "./ServiceCatalogPicker";
 import ProductCart from "./ProductCart";
@@ -472,7 +473,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           <ProductCart onTotalChange={setProductsTotal} value={cart} onChange={setCart} servicePrice={price} tipAmount={!isPending && hasTip ? tipAmount : 0} />
           <p className="text-sm font-bold text-gray-600">Comisión del lavado: {(commission(washers.find(w => w.id === selectedWasherId)?.commissionPercentage, commissionPercent) * 100).toFixed(2)}%</p>
           {isPending && <MoneyInput label="Precio previsto del lavado (opcional)" value={price} onChange={setPrice} />}
-          <p className="text-xs text-gray-500">Para cobrar se requiere una caja abierta. Los productos pendientes se reservan al guardar. El total de productos se suma al precio del lavado.</p>
+          <HelpTip label="Sobre el cobro">Para cobrar se requiere una caja abierta. Los productos pendientes se reservan al guardar. El total de productos se suma al precio del lavado.</HelpTip>
           {/* BOTÓN GUARDAR */}
           <button
             type="submit"
