@@ -26,6 +26,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
   const localRequire = (name) => {
     if (name === "react") return hooks;
     if (name === "@/lib/operations/model") return require("../.test-build/operations/model.js");
+    if (name === "@/lib/reports/activity") return require("../.test-build/reports/activity.js");
     if (name === "@/lib/reports/cash") return require("../.test-build/reports/cash.js");
     if (name === "@/lib/reports/fonts") return {normalFont:"",boldFont:""};
     if(name === "@/lib/operations/treasury-model")return require("../.test-build/operations/treasury-model.js");
@@ -265,4 +266,12 @@ test('mixed service receipts are distributed by their actual methods in reports 
  await h.refresh();await h.button('Control Financiero Interno').props.onClick();
  const table=h.tables.find(t=>t.head?.[0]?.[0]==='Método');
  assert.equal(table.body.find(r=>r[0]==='Efectivo')[1],'$8.00');assert.equal(table.body.find(r=>r[0]==='Yappy')[1],'$12.00');assert.equal(table.body.find(r=>r[0]==='Tarjeta')[2],'$3.00');
+});
+
+
+test('activity on finance panel includes unpaid services and excludes cancelled work without inflating payroll',async()=>{
+ const h=harness([service('a','Ana',5,{serviceItems:[{catalogId:'wash',name:'Lavado'},{catalogId:'engine',name:'Motor'}]}),service('a','Ana',4,{paymentStatus:'pending',serviceItems:[{catalogId:'wash',name:'Lavado'}]}),service('a','Ana',10,{status:'cancelled'}),service('a','Ana',2)]);
+ await h.refresh();const panel=h.nodes(h.render()).find(n=>typeof n.type==='function'&&n.props.title==='Vehículos y servicios del período');
+ assert.equal(panel.props.activity.vehicles,3);assert.equal(panel.props.activity.services,4);assert.equal(panel.props.activity.rows.find(row=>row.id==='catalog:wash').count,2);assert.equal(panel.props.activity.rows.find(row=>row.id==='custom').count,1);
+ assert.match(h.textOf(h.render()),/Total a pagar: \$7\.00/);
 });

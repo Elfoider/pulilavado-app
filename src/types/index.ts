@@ -45,6 +45,7 @@ export interface ServiceDocument {
   };
   status?: string;
   cashSessionId?: string | null;
+  serviceLabel?: string;
   serviceItems?: import("@/lib/operations/model").ServiceLine[];
   products?: import("@/lib/operations/model").ProductLine[];
   financials: {

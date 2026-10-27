@@ -32,6 +32,8 @@ import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from 
 import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
 import { paymentParts } from "@/lib/operations/model";
 import { type TreasuryReport } from "@/lib/reports/treasury";
+import ActivitySummary from "./ActivitySummary";
+import { summarizeActivity } from "@/lib/reports/activity";
 import HelpTip from "./HelpTip";
 import SectionLink from "./SectionLink";
 
@@ -80,6 +82,7 @@ export default function ReportsPage() {
     Transferencia: 0,
   });
 
+  const [activity,setActivity]=useState<ReturnType<typeof summarizeActivity> | null>(null);
   const [periodCash, setPeriodCash] = useState<PeriodCash>();
   const [cashBreakdown, setCashBreakdown] = useState(() => cashMovementBreakdown([]));
 
@@ -145,8 +148,10 @@ export default function ReportsPage() {
       const washerMap: Record<string, PayrollItem> = {};
 
 
+      const activityRecords: Parameters<typeof summarizeActivity>[0] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
+        activityRecords.push(data);
         if (data.status !== "cancelled" && data.paymentStatus !== "pending") {
           const fin = data.financials || {};
           const servicePrice = fin.totalPrice || 0;
@@ -201,6 +206,7 @@ export default function ReportsPage() {
       Object.values(washerMap).forEach(item => { const result = netPayroll(item.totalPay,item.advances); item.netPay=result.pay; item.excess=result.excess; });
       const [cashSnapshot, weekSummary] = await Promise.all([loadCashReport({start, end}), filterType === "week" ? loadTreasuryReport(end) : Promise.resolve(undefined)]);
       if (requestId !== reportRequest.current) return;
+      setActivity(summarizeActivity(activityRecords));
       setPeriodCash(cashSnapshot.periodCash);
       setCashBreakdown(cashMovementBreakdown(cashSnapshot.movements));
       setAdvanceRows(periodAdvances);
@@ -510,6 +516,7 @@ export default function ReportsPage() {
         <HelpTip label="Cómo se relacionan los totales">Son desgloses de los totales: no se suman entre sí. Los vales ya forman parte de las salidas de Caja y se descuentan de la nómina; no se vuelven a restar de los ingresos después de comisiones. Los gastos directos de sobres se consultan en su control semanal.</HelpTip>
       </section>
 
+      <ActivitySummary activity={activity} ready={reportReady} title="Vehículos y servicios del período"/>
       <SectionLink href="/movements">Consultar movimientos por fechas</SectionLink>
 
       {/* DESGLOSES */}

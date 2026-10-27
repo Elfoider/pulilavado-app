@@ -621,6 +621,7 @@ export function createOperations(
             paymentStatus: input.paymentStatus,
             products: plan.lines,
             serviceItems,
+            serviceLabel: serviceItems.length ? "Servicios de catálogo" : "Servicio personalizado",
             financials:
               old && oldPaid && !allocationChanged && !changed ? oldFin : fin,
             washerName: washer.name,

@@ -19,6 +19,11 @@ import {
   AlertCircle,
   ParkingSquare,
 } from "lucide-react";
+import ActivitySummary from "@/components/ActivitySummary";
+import SectionLink from "@/components/SectionLink";
+import HelpTip from "@/components/HelpTip";
+import { summarizeActivity } from "@/lib/reports/activity";
+import { businessDay, dayStart, addDays } from "@/lib/operations/treasury-model";
 import NewServiceModal from "@/components/NewServiceModal";
 import ServiceDetailsModal from "@/components/ServiceDetailsModal";
 import { ServiceDocument } from "@/types";
@@ -30,6 +35,8 @@ export default function DashboardPage() {
   const [selectedService, setSelectedService] = useState<ServiceDocument | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  const [activity,setActivity]=useState<ReturnType<typeof summarizeActivity> | null>(null);
+  const [fetchError,setFetchError]=useState("");
   const [services, setServices] = useState<ServiceDocument[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -43,12 +50,11 @@ export default function DashboardPage() {
   });
 
   const fetchData = async () => {
-    setLoading(true);
+    setLoading(true);setFetchError("");
     try {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
+      const today=businessDay();
+      const start=dayStart(today);
+      const end=new Date(dayStart(addDays(today,1)).getTime()-1);
 
       const q = query(
         collection(db, "services"),
@@ -112,6 +118,7 @@ export default function DashboardPage() {
         bestName = best.name;
       }
 
+      setActivity(summarizeActivity(activeData));
       setStats({
         totalSales: sales,
         totalTips: tips,
@@ -121,6 +128,7 @@ export default function DashboardPage() {
         washerStats: washersArray,
       });
     } catch (error) {
+      setActivity(null);setFetchError("No se pudo cargar la actividad del día. Intente actualizar la página.");
       console.error("Error cargando datos:", error);
     } finally {
       setLoading(false);
@@ -195,7 +203,7 @@ export default function DashboardPage() {
         </div>
         <div className="bg-white/80 backdrop-blur-md p-5 rounded-2xl border-l-4 border-l-purple-500 shadow-sm">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
-            Total Autos
+            Vehículos atendidos
           </h3>
           <div className="mt-2 flex items-center gap-2">
             <Car className="w-8 h-8 text-purple-500" />
@@ -211,7 +219,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-600">Las ventas incluyen lavados y productos. Para el saldo real de la jornada y los cobros de pendientes visite <a href="/cash" className="text-cyan-700 underline">Caja</a>.</p>
+      {fetchError && <p role="alert" className="text-red-700">{fetchError}</p>}
+      <ActivitySummary activity={activity} ready={!loading && !fetchError}/>
+      <div className="flex flex-wrap items-center gap-2"><HelpTip label="Ventas y saldo de caja">Las ventas incluyen servicios y productos. Los cobros pendientes se muestran cuando se registran sus pagos.</HelpTip><SectionLink href="/cash">Caja</SectionLink></div>
       {/* EQUIPO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {stats.washerStats.map((w) => (
@@ -303,6 +313,7 @@ export default function DashboardPage() {
                       <div className="text-xs text-gray-500 font-bold uppercase">
                         {svc.vehicle?.color}
                       </div>
+                      <div className="text-xs text-cyan-800 mt-1">{svc.serviceItems?.length ? svc.serviceItems.map(line=>line.name).join(" · ") : "Servicio personalizado"}</div>
                     </td>
                     <td className="px-6 py-4 text-gray-700 font-medium">
                       <div

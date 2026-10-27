@@ -45,6 +45,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.5.1 - Caja y ayudas";
+export const versionSoft = "v1.5.2 - Actividad de servicios";
 
 

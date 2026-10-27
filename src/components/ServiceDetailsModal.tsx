@@ -330,7 +330,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
                 className={`p-4 rounded-xl border space-y-3 ${formData.paymentStatus === "pending" ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"}`}
               >
                 <ServiceCatalogPicker value={serviceItems} onChange={lines=>{setServiceItems(lines);setFormData({...formData,price:money(lines.reduce((sum,line)=>sum+line.unitPrice,0))});}}/>
-                {serviceItems.length ? <p className="font-bold">Total de servicios: ${formData.price.toFixed(2)}</p> : <MoneyInput label="Precio manual del lavado" value={formData.price} onChange={price=>setFormData({...formData,price})}/>}
+                {serviceItems.length ? <p className="font-bold">Total de servicios: ${formData.price.toFixed(2)}</p> : <MoneyInput label="Servicio personalizado ($)" value={formData.price} onChange={price=>setFormData({...formData,price})}/>}
                 <div className="grid grid-cols-1 gap-3 mt-2">
                   {formData.paymentStatus === "paid" && <PaymentEditor method={formData.paymentMethod === "Pendiente" ? "" : formData.paymentMethod} payments={payments} total={money(formData.price+currentProductsTotal)} onChange={(method,parts)=>{setPayments(parts);setFormData({...formData,paymentMethod:method});}}/>}
                   <div>
@@ -399,6 +399,7 @@ export default function ServiceDetailsModal({ service, onClose }: Props) {
             // --- MODO VISUALIZACIÓN ---
             <>
               {service.status === "cancelled" && <p className="rounded-xl bg-gray-100 p-3 font-bold">Servicio anulado. Este registro se conserva para consulta.</p>}
+              {!(service.serviceItems?.length) && <section className="border rounded-xl p-4"><h3 className="font-bold">Servicio personalizado</h3><p className="text-sm text-gray-600">${(service.financials.servicePrice ?? service.financials.totalPrice-(service.financials.productsTotal??0)).toFixed(2)}</p></section>}
               {(service.serviceItems?.length ?? 0)>0 && <section className="border rounded-xl p-4 space-y-2"><h3 className="font-bold">Servicios realizados</h3>{service.serviceItems?.map(line=><p key={line.catalogId} className="flex justify-between gap-3 text-sm"><span>{line.name}</span><b>${line.unitPrice.toFixed(2)}</b></p>)}</section>}
               {(service.products?.length ?? 0) > 0 && <section className="border rounded-xl p-4 space-y-2"><h3 className="font-bold">Productos del servicio</h3>{service.products?.map(l => <p className="text-sm flex justify-between" key={l.productId}><span>{l.quantity} × {l.name}</span><b>${l.total.toFixed(2)}</b></p>)}<p className="text-sm text-gray-500">Lavado: ${formData.price.toFixed(2)} · Productos: ${productsTotal.toFixed(2)}</p></section>}
               {formData.paymentStatus === "pending" && (

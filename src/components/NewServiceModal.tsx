@@ -402,7 +402,7 @@ export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
           </div>
 
           <ServiceCatalogPicker value={serviceItems} onChange={lines=>{setServiceItems(lines);setPrice(money(lines.reduce((sum,line)=>sum+line.unitPrice,0)));}}/>
-          {serviceItems.length ? <p className="font-bold">Total de servicios: ${price.toFixed(2)}</p> : <MoneyInput label="Precio manual del lavado" value={price} onChange={setPrice}/>}
+          {serviceItems.length ? <p className="font-bold">Total de servicios: ${price.toFixed(2)}</p> : <MoneyInput label="Servicio personalizado ($)" value={price} onChange={setPrice}/>}
           {/* 4. SECCIÓN FINANCIERA (CONDICIONAL) */}
           {isPending ? (
             // --- MODO PENDIENTE ---
