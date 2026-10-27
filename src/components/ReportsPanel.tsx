@@ -27,7 +27,7 @@ import { formatMoney } from "@/lib/utils";
 import { loadCashReport } from "@/lib/reports/loadCash";
 import { financialPDF } from "@/lib/reports/pdf";
 import { financialExcel, saveExcel } from "@/lib/reports/excel";
-import { type PeriodCash, type FinancialReport } from "@/lib/reports/cash";
+import { cashMovementBreakdown, type PeriodCash, type FinancialReport } from "@/lib/reports/cash";
 import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from "@/lib/operations/treasury-model";
 import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
 import { type TreasuryReport } from "@/lib/reports/treasury";
@@ -79,6 +79,7 @@ export default function ReportsPage() {
   });
 
   const [periodCash, setPeriodCash] = useState<PeriodCash>();
+  const [cashBreakdown, setCashBreakdown] = useState(() => cashMovementBreakdown([]));
 
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
@@ -205,6 +206,7 @@ export default function ReportsPage() {
       const [cashSnapshot, weekSummary] = await Promise.all([loadCashReport({start, end}), filterType === "week" ? loadTreasuryReport(end) : Promise.resolve(undefined)]);
       if (requestId !== reportRequest.current) return;
       setPeriodCash(cashSnapshot.periodCash);
+      setCashBreakdown(cashMovementBreakdown(cashSnapshot.movements));
       setAdvanceRows(periodAdvances);
       setWeekly(weekSummary);
       setServiceSales(tempServiceSales);
@@ -417,7 +419,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-600">Las ventas y propinas usan la fecha de registro y excluyen pendientes y anulados. El efectivo en caja muestra el saldo actual, independiente del período seleccionado. Para registrar pagos y consultar movimientos visite <a href="/cash" className="underline text-cyan-700">Caja</a>. Registre cada pago de propinas como gasto o retiro en Efectivo para descontarlo del saldo.</p>
+      <p className="text-sm text-gray-600">Las ventas y propinas usan la fecha de registro y excluyen pendientes y anulados. Todos los importes corresponden al rango seleccionado. Los saldos de varias cajas se muestran acumulados. Para registrar pagos y consultar movimientos visite <a href="/cash" className="underline text-cyan-700">Caja</a>. Registre cada pago de propinas como gasto o retiro en Efectivo para descontarlo del saldo.</p>
       {/* KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         <div className="p-6 rounded-2xl bg-gray-900 text-white shadow-xl shadow-gray-900/20 border border-gray-700 relative overflow-hidden">
@@ -477,7 +479,40 @@ export default function ReportsPage() {
           </h3>
           <p className="text-orange-600/70 text-xs mt-1">Comisiones menos vales del período</p>
         </div>
+        <div className="p-6 rounded-2xl bg-rose-50 border border-rose-200" aria-label="Vales entregados">
+          <p className="text-rose-700 text-xs font-bold uppercase tracking-wider mb-2">Vales entregados</p>
+          <h3 className="text-3xl font-black text-rose-900">{reportReady ? formatMoney(advanceRows.reduce((sum,row)=>sum+row.amount,0)) : "—"}</h3>
+          {reportReady && <p className="text-xs text-rose-700 mt-1">{advanceRows.length} vale(s) · {new Set(advanceRows.map(row=>row.washerId)).size} lavador(es)</p>}
+        </div>
       </div>
+
+      <section className="space-y-3" aria-label="Resumen de cobros y nómina">
+        <h3 className="font-bold text-lg text-gray-800">Cobros y nómina del período</h3>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {[
+            {label:"Total cobrado",amount:serviceSales+totalTips,note:"Ventas más propinas, todos los métodos."},
+            {label:"Cobros digitales",amount:["Yappy","Tarjeta","Transferencia"].reduce((sum,method)=>sum+incomeByMethod[method as keyof typeof incomeByMethod]+tipsByMethod[method as keyof typeof tipsByMethod],0),note:"Ventas y propinas; no son efectivo físico."},
+            {label:"Comisiones antes de vales",amount:totalPayrollToPay,note:"Comisiones brutas generadas por los lavadores."},
+            {label:"Excedente de vales",amount:payrollList.reduce((sum,row)=>sum+row.excess,0),note:"Vales que superan las comisiones de cada lavador; revisar al pagar."},
+          ].map(card=><div key={card.label} aria-label={card.label} className="bg-white border rounded-xl p-4"><p className="text-sm text-gray-600">{card.label}</p><p className="text-2xl font-bold mt-1">{reportReady ? formatMoney(card.amount) : "—"}</p><p className="text-xs text-gray-500 mt-2">{card.note}</p></div>)}
+        </div>
+      </section>
+      <section className="space-y-3" aria-label="Desglose de efectivo del período">
+        <h3 className="font-bold text-lg text-gray-800">Entradas y salidas de efectivo</h3>
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {[
+            {label:"Cobros netos en efectivo",amount:cashBreakdown.collections,note:"Ventas y propinas, después de reversiones y devoluciones."},
+            {label:"Gastos pagados desde Caja",amount:cashBreakdown.expenses,note:"Solo movimientos de tipo Gasto en efectivo."},
+            {label:"Retiros y pagos desde Caja",amount:cashBreakdown.withdrawals,note:"Retiros en efectivo; los vales se muestran por separado."},
+            {label:"Salidas totales de Caja",amount:periodCash?.outgoing ?? 0,note:"Incluye gastos, retiros, vales y guardados en sobres."},
+            {label:"Guardado en sobres",amount:cashBreakdown.savedToEnvelopes,note:"Traslado desde Caja; no es un gasto del negocio."},
+            {label:"Refuerzos desde sobres",amount:cashBreakdown.fromEnvelopes,note:"Dinero trasladado a Caja; no es una venta."},
+            {label:"Ingresos adicionales a Caja",amount:cashBreakdown.funding,note:"Fondos adicionales; no equivalen a ganancias."},
+            {label:"Fondos iniciales acumulados",amount:periodCash?.opening,note:"Suma de los fondos de las cajas del rango; sin contarlos como ventas."},
+          ].map(card=><div key={card.label} aria-label={card.label} className="bg-white border rounded-xl p-4"><p className="text-sm text-gray-600">{card.label}</p><p className="text-2xl font-bold mt-1">{!reportReady ? "—" : card.amount == null ? "No disponible" : formatMoney(card.amount)}</p><p className="text-xs text-gray-500 mt-2">{card.note}</p></div>)}
+        </div>
+        <p className="text-xs text-gray-500">Son desgloses de los totales: no se suman entre sí. Los vales ya forman parte de las salidas de Caja y se descuentan de la nómina; no se vuelven a restar de los ingresos después de comisiones. Los gastos directos de sobres se consultan en su control semanal.</p>
+      </section>
 
       <Link href="/movements" className="inline-block text-cyan-800 underline">Consultar movimientos de caja por fechas</Link>
 

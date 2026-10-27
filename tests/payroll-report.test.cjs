@@ -25,13 +25,14 @@ function harness(services = [], cash = { session: null, loading: false, error: "
   let fail = false;
   const localRequire = (name) => {
     if (name === "react") return hooks;
+    if (name === "@/lib/reports/cash") return require("../.test-build/reports/cash.js");
     if (name === "@/lib/reports/fonts") return {normalFont:"",boldFont:""};
     if(name === "@/lib/operations/treasury-model")return require("../.test-build/operations/treasury-model.js");
     if(name === "@/lib/reports/loadTreasury")return {loadTreasuryReport:async()=>undefined};
     if (name === "@/lib/reports/loadCash") return {loadCashReport: async (range) => {
       cashRequests.push(range);
       const balance=cash.session?.balances.Efectivo ?? 0, opening=cash.session?.openingAmount ?? 0;
-      return {session:null,movements:[],periodCash:cash.periodCash ?? {balance,opening,incoming:balance-opening,outgoing:0,net:balance-opening,reconciled:true,sessionCount:cash.session?1:0}};
+      return {session:null,movements:cash.movements ?? [],periodCash:cash.periodCash ?? {balance,opening,incoming:balance-opening,outgoing:0,net:balance-opening,reconciled:true,sessionCount:cash.session?1:0}};
     }};
     if (name === "@/lib/reports/excel") return {financialExcel() {}, saveExcel() {}};
     if (name === "@/lib/reports/pdf") {
@@ -233,4 +234,22 @@ test("historical exports pass identical selected dates to PDF and Excel without 
  assert.ok(h.documents[0].texts.includes("$7.00"));
  assert.ok(!JSON.stringify(h.documents[0].texts).includes("9999"));
  assert.ok(!h.textOf(h.render()).includes("9999"));
+});
+
+
+test("finance cards show period advances, gross commissions and cash breakdown without counting advances twice",async()=>{
+ const cash={session:null,periodCash:{balance:40,opening:20,net:20,incoming:70,outgoing:50,reconciled:true,sessionCount:1},movements:[
+  {method:"Efectivo",kind:"expense",amount:-5},{method:"Efectivo",kind:"withdrawal",amount:-10},{method:"Efectivo",kind:"envelope_deposit",amount:-15},{method:"Efectivo",kind:"income",amount:4},
+ ]};
+ const h=harness([service("a","Ana",50,{financials:{totalPrice:100,washerEarnings:50,businessEarnings:50,paymentMethod:"Tarjeta"}}),service("b","Luis",10,{paymentMethod:"Efectivo"})],cash,[{id:"v",washerId:"a",washerName:"Ana",amount:20,day:"2026-10-27"}]);
+ await h.refresh();
+ const card=label=>h.nodes(h.render()).find(n=>n.props?.["aria-label"]===label);
+ assert.match(h.textOf(card("Vales entregados")),/\$20\.00.*1 vale.*1 lavador/);
+ assert.match(h.textOf(card("Comisiones antes de vales")),/\$60\.00/);
+ assert.match(h.textOf(card("Gastos pagados desde Caja")),/\$5\.00/);
+ assert.match(h.textOf(card("Salidas totales de Caja")),/\$50\.00/);
+ assert.match(h.textOf(card("Guardado en sobres")),/\$15\.00/);
+ assert.match(h.textOf(card("Cobros digitales")),/\$100\.00/);
+ h.nodes(h.render()).find(n=>n.type==="input" && n.props.type==="date").props.onChange({target:{value:"2026-10-01"}});
+ assert.ok(!h.textOf(card("Vales entregados")).includes("$20.00"));
 });

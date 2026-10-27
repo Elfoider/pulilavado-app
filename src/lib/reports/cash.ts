@@ -106,3 +106,20 @@ export function reportCashView(report: FinancialReport) {
   return report.session ? { ...cashTotals(report.session, report.currentSessionMovements ?? report.movements), opening: report.session.openingAmount, balance: report.session.balances.Efectivo, sessionCount: 1 } :
     { opening: 0, balance: 0, incoming: 0, outgoing: 0, net: 0, reconciled: true, sessionCount: 0 };
 }
+
+
+export function cashMovementBreakdown(rows: DetailedMovement[]) {
+  const totals = { collections: 0, expenses: 0, withdrawals: 0, savedToEnvelopes: 0, fromEnvelopes: 0, funding: 0 };
+  const collections = new Set(["sale", "sale_refund", "service_payment", "service_payment_tip", "service_correction", "service_correction_tip", "service_refund", "service_refund_tip"]);
+  for (const row of rows) {
+    if (row.method !== "Efectivo") continue;
+    if (!Number.isFinite(row.amount)) throw new Error("Hay movimientos de efectivo inválidos.");
+    if (collections.has(row.kind)) totals.collections = money(totals.collections + row.amount);
+    else if (row.kind === "expense") totals.expenses = money(totals.expenses - row.amount);
+    else if (row.kind === "withdrawal") totals.withdrawals = money(totals.withdrawals - row.amount);
+    else if (row.kind === "envelope_deposit") totals.savedToEnvelopes = money(totals.savedToEnvelopes - row.amount);
+    else if (row.kind === "envelope_to_cash") totals.fromEnvelopes = money(totals.fromEnvelopes + row.amount);
+    else if (row.kind === "income") totals.funding = money(totals.funding + row.amount);
+  }
+  return totals;
+}

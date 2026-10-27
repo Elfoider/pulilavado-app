@@ -55,3 +55,13 @@ test('weekly PDF and Excel include advances, envelope states and old-envelope wi
  const pdf=financialPDF(data);assert.ok(pdf.getNumberOfPages()>=2);
  const wb=XLSX.read(financialExcel(data),{type:'array'});assert.deepEqual(wb.SheetNames,['Resumen','Movimientos','Vales','Control semanal']);assert.equal(wb.Sheets.Resumen.F34.v,20);assert.equal(wb.Sheets.Resumen.F37.v,10.10);assert.equal(wb.Sheets.Vales.C2.v,20);assert.equal(wb.Sheets['Control semanal'].B4.v,75);assert.ok(XLSX.utils.sheet_to_json(wb.Sheets['Control semanal'],{header:1}).flat().includes('2026-10-20'));
 });
+
+
+test('cash breakdown nets corrected receipts and keeps expenses, advances and transfers distinct',()=>{
+ const {cashMovementBreakdown}=require('../.test-build/reports/cash.js');
+ const row=(kind,amount,method='Efectivo')=>({kind,amount,method});
+ assert.deepEqual(cashMovementBreakdown([
+  row('opening',65),row('service_payment',10),row('service_correction',-10),row('service_payment',8),row('service_payment_tip',2),row('sale_refund',-3),
+  row('expense',-5),row('withdrawal',-7),row('payroll_advance',-20),row('envelope_deposit',-30),row('envelope_to_cash',10),row('income',4),row('expense',-99,'Tarjeta'),
+ ]),{collections:7,expenses:5,withdrawals:7,savedToEnvelopes:30,fromEnvelopes:10,funding:4});
+});
