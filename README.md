@@ -1,6 +1,6 @@
 # Sistema Pulilavado / Mr. Espuma
 
-Actualización 1.3.10 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
+Actualización 1.4.0 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
 
 Lea [GUIA_ACTUALIZACION.md](GUIA_ACTUALIZACION.md) para instalación, configuración de Firebase, reglas operativas, tratamiento de datos históricos y pruebas.
 
@@ -25,3 +25,5 @@ La tarjeta «Efectivo neto de la jornada» muestra el saldo de la caja abierta m
 La versión 1.3.9 incorpora el reporte financiero con gráficas, exportación a Excel (Resumen y Movimientos) y los saldos antes/después de cada nuevo movimiento. Consulte [REPORTES_Y_MOVIMIENTOS.md](REPORTES_Y_MOVIMIENTOS.md).
 
 La versión 1.3.10 corrige la estructura Open XML de la exportación para evitar que Excel repare o descarte la hoja Resumen.
+
+La versión 1.4.0 incorpora vales por lavador con descuento en nómina y el control de sobres diarios y efectivo semanal de martes a lunes. Instrucciones: [VALES_Y_SOBRES.md](VALES_Y_SOBRES.md).

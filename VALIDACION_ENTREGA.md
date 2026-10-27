@@ -64,3 +64,8 @@ Para 1.3.4 aprobaron ESLint y la compilación de producción (con la configuraci
 ## Corrección 1.3.10 — apertura del Excel
 
 Se corrige el orden de printOptions/pageMargins/pageSetup respecto a ignoredErrors y se ubica pane dentro de sheetView (no sheetViews). La dimensión del resumen incluye las celdas combinadas y el área de impresión. Prueba de regresión de estructura, además de importes y gráficas, añadida al conjunto automatizado.
+
+
+## Actualización 1.4.0 — vales y sobres
+
+66 pruebas automatizadas, incluida la operación completa de comisiones, vales, guardado, pago neto y retiro de un sobre anterior en otra semana; límites de saldo, concurrencia y reintentos. Revisión ESLint y build de producción. Prueba real de interfaz en Chromium contra Firestore emulado: vale $20, nómina $50-$20=$30, guardado $80, refuerzo a Caja $20 y gasto $5 de un sobre anterior; efectivo neto semanal $55. Descargas PDF y Excel verificadas y pantalla revisada en escritorio y móvil. El PDF semanal tiene resumen, saldos de sobres y retiros trazables; el de nómina muestra el descuento por vales.

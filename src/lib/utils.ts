@@ -6,7 +6,7 @@ import {
   BarChart3,
   Settings,
   Heart,
-  History, Package, ShoppingCart, Wallet
+  History, Package, ShoppingCart, Wallet, Mail
 } from "lucide-react";
 
 export const menuItems = [
@@ -17,6 +17,7 @@ export const menuItems = [
   { name: "Clientes", href: "/clients", icon: Heart },
   { name: "Reportes y Finanzas", href: "/reports", icon: BarChart3 },
   { name: "Caja", href: "/cash", icon: Wallet },
+  { name: "Sobres con dinero", href: "/envelopes", icon: Mail },
   { name: "Inventario", href: "/inventory", icon: Package },
   { name: "Venta de productos", href: "/sales", icon: ShoppingCart },
   { name: "Configuración", href: "/settings", icon: Settings },
@@ -42,6 +43,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.3.4 - Nómina seleccionable";
+export const versionSoft = "v1.4.0 - Vales y sobres";
 
 

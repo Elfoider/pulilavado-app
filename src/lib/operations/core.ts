@@ -16,10 +16,13 @@ import {
   emptyBalances,
 } from "./model";
 
+import { createTreasuryOperations } from "./treasury";
+
 export function createOperations(
   atomic: Atomic,
   stamp: () => unknown,
   id: () => string,
+  now: () => Date = () => new Date(),
 ) {
   async function openSession(tx: AtomicTx) {
     const control = await tx.get("cashControl/current");
@@ -48,6 +51,9 @@ export function createOperations(
       tips?: number;
       receipts?: number;
       expenses?: number;
+      washerId?: string;
+      washerName?: string;
+      envelopeDay?: string;
     }[],
   ) {
     const balances = { ...session.balances };
@@ -654,5 +660,5 @@ export function createOperations(
       });
     },
   };
-  return api;
+  return { ...api, ...createTreasuryOperations(atomic, stamp, openSession, ledger, now) };
 }

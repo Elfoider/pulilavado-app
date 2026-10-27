@@ -1,6 +1,7 @@
 import { CashMovement, CashSession, METHODS, emptyBalances, money } from "../operations/model";
 
 export const movementKinds: Record<string, string> = {
+  payroll_advance: "Vale a lavador", envelope_deposit: "Guardado en sobre", envelope_to_cash: "Refuerzo desde sobre",
   opening: "Apertura", expense: "Gasto", withdrawal: "Retiro / pago", income: "Ingreso adicional",
   sale: "Venta", sale_refund: "Anulación venta", service_payment: "Cobro servicio",
   service_payment_tip: "Propina recibida", service_correction: "Reversión cobro",
@@ -40,12 +41,18 @@ export function cashTotals(session: CashSession, rows: CashMovement[]) {
   let incoming = 0, outgoing = 0;
   for (const row of rows) {
     if (row.method !== "Efectivo" || row.kind === "opening") continue;
-    if (row.kind === "expense" || row.kind === "withdrawal") outgoing = money(outgoing - row.amount);
+    if (row.kind === "expense" || row.kind === "withdrawal" || row.kind === "payroll_advance" || row.kind === "envelope_deposit") outgoing = money(outgoing - row.amount);
     else incoming = money(incoming + row.amount);
   }
   return { incoming, outgoing, net: money(session.balances.Efectivo - session.openingAmount), reconciled: Math.abs(session.openingAmount + incoming - outgoing - session.balances.Efectivo) < .005 };
 }
+import { type CashAdvance } from "../operations/treasury-model";
+import { type TreasuryReport } from "./treasury";
 export interface FinancialReport {
+  advanceRows?: CashAdvance[];
+  advancesTotal?: number;
+  payrollNet?: number;
+  weekly?: TreasuryReport;
   period: string;
   generatedAt: string;
   sales: number;

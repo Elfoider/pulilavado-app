@@ -47,3 +47,11 @@ test('Excel worksheet elements follow Open XML order and panes belong inside a s
  assert.match(details,/<sheetViews><sheetView\b[^>]*><pane\b[^>]*\/><\/sheetView><\/sheetViews>/);
  assert.doesNotMatch(details,/<sheetViews><pane\b/);
 });
+
+
+test('weekly PDF and Excel include advances, envelope states and old-envelope withdrawals',()=>{
+ const weekly={start:'2026-10-27',end:'2026-11-02',cashReceipts:100,cashOutgoings:20,advances:20,netGenerated:75,deposited:80,envelopeExpenses:5,toCash:0,envelopeBalance:80,envelopes:[{id:'2026-10-27',day:'2026-10-27',weekStart:'2026-10-27',balance:80,deposited:80,spent:0,toCash:0,revision:1}],envelopeMovements:[{id:'old',day:'2026-10-27',envelopeDay:'2026-10-20',kind:'expense',amount:-5,balanceBefore:20,balanceAfter:15,description:'Emergencia de otro sobre'}],advanceRows:[]};
+ const data={...report,weekly,advancesTotal:20,payrollNet:10.10,advanceRows:[{id:'vale1',day:'2026-10-27',washerId:'a',washerName:'Ana',amount:20,description:'Adelanto',sessionId:'cash'}]};
+ const pdf=financialPDF(data);assert.ok(pdf.getNumberOfPages()>=2);
+ const wb=XLSX.read(financialExcel(data),{type:'array'});assert.deepEqual(wb.SheetNames,['Resumen','Movimientos','Vales','Control semanal']);assert.equal(wb.Sheets.Resumen.F34.v,20);assert.equal(wb.Sheets.Resumen.F37.v,10.10);assert.equal(wb.Sheets.Vales.C2.v,20);assert.equal(wb.Sheets['Control semanal'].B4.v,75);assert.ok(XLSX.utils.sheet_to_json(wb.Sheets['Control semanal'],{header:1}).flat().includes('2026-10-20'));
+});

@@ -20,6 +20,7 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   put(26, 1, "Comisiones y propinas");
   [["Comisiones generadas", report.payroll], ["Ventas menos comisiones", report.business], ["Propinas recibidas", METHODS.reduce((s, m) => s + report.tips[m], 0)], ["Salidas de efectivo", cash?.reconciled ? cash.outgoing : "No disponible"]].forEach(([label, value], i) => { put(27 + i, 1, label); put(27 + i, 6, value); });
   put(32, 1, "Ingresos del negocio antes de costos y gastos."); put(33, 1, "Caja actual independiente del filtro de ventas.");
+  if (report.advancesTotal !== undefined) {put(34,1,"Vales descontados del período");put(34,6,report.advancesTotal);put(37,1,"Nómina neta del período");put(37,6,report.payrollNet??report.payroll);}
   put(35, 1, `Caja: ${report.session?.id ?? "Sin caja abierta"}`); put(36, 1, "Arqueo físico: pendiente");
   put(35, 10, "Guardar"); put(35, 11, cash?.net ?? null); put(36, 10, "Salidas"); put(36, 11, cash?.outgoing ?? null);
   put(38, 1, "Preparado por: __________________"); put(38, 10, "Revisado por: __________________");
@@ -29,6 +30,7 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   summary["!cols"] = Array.from({ length: 16 }, (_, i) => ({ wch: i === 0 ? 16 : 9 }));
   summary["!merges"] = ["A1:H1", "A2:H2", "A3:H3", "J3:P3", "A5:P5", "A6:P7", "A9:E9", "F9:H9", "A10:E10", "F10:H10", "A19:H19", "A26:H26", "A32:H32", "A33:H33", "A35:H35", "A36:H36", "A38:H38", "J38:P38", ...Array.from({length: 11}, (_,i)=>i < 5 ? `A${20+i}:E${20+i}` : i < 9 ? `A${27+i-5}:E${27+i-5}` : i===9 ? "F24:H24" : "F23:H23")].map(XLSX.utils.decode_range);
   for (const r of [20,21,22,27,28,29,30]) summary["!merges"]!.push(XLSX.utils.decode_range(`F${r}:H${r}`));
+  if(report.advancesTotal!==undefined) for(const range of ["A34:E34","F34:H34","A37:E37","F37:H37"]) summary["!merges"]!.push(XLSX.utils.decode_range(range));
   for (const addr of Object.keys(summary)) { if (addr.startsWith("!")) continue; if (summary[addr].t === "n") summary[addr].z = '"$"#,##0.00;[Red]("$"#,##0.00)'; }
   const details = [["Fecha", "Orden", "Tipo", "Método", "Monto", "Saldo método antes", "Saldo método después", "Efectivo antes", "Efectivo después", "Yappy antes", "Yappy después", "Tarjeta antes", "Tarjeta después", "ACH antes", "ACH después", "Detalle", "Referencia", "ID movimiento", "Saldos"],
     ...report.movements.map(m => [m.createdAt ? (m.createdAt.seconds - 4 * 3600) / 86400 + 25569 : null, m.sequence ?? null, movementKinds[m.kind] ?? m.kind, m.method, m.amount, m.balancesBefore?.[m.method] ?? null, m.balancesAfter?.[m.method] ?? null, ...METHODS.flatMap(method => [m.balancesBefore?.[method] ?? null, m.balancesAfter?.[method] ?? null]), m.description, m.referenceId, m.id, m.balanceSource])];
@@ -37,6 +39,15 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   movements["!autofilter"] = { ref: `A1:S${details.length}` };
   for (let r = 2; r <= details.length; r++) { if (movements[`A${r}`]) movements[`A${r}`].z = "dd/mm/yyyy hh:mm:ss"; for (let col = 4; col <= 14; col++) { const cell = movements[`${XLSX.utils.encode_col(col)}${r}`]; if (cell?.t === "n") cell.z = '"$"#,##0.00;[Red]("$"#,##0.00)'; } }
   XLSX.utils.book_append_sheet(wb, summary, "Resumen"); XLSX.utils.book_append_sheet(wb, movements, "Movimientos");
+  if (report.advanceRows) {
+    const data=[["Fecha","Lavador","Monto del vale","Motivo","Caja","Referencia"],...report.advanceRows.map(a=>[a.day,a.washerName,a.amount,a.description,a.sessionId,a.id])];
+    const sheet=XLSX.utils.aoa_to_sheet(data);sheet["!cols"]=[{wch:15},{wch:25},{wch:18},{wch:48},{wch:30},{wch:30}];sheet["!autofilter"]={ref:`A1:F${data.length}`};for(let r=2;r<=data.length;r++)if(sheet[`C${r}`])sheet[`C${r}`].z='"$"#,##0.00';XLSX.utils.book_append_sheet(wb,sheet,"Vales");
+  }
+  if(report.weekly){
+    const w=report.weekly;
+    const data:(string|number|null)[][]=[["Control semanal de efectivo"],[`Martes ${w.start} a lunes ${w.end}`],["Concepto","Monto"],["Efectivo neto generado",w.netGenerated],["Cobros netos en efectivo",w.cashReceipts],["Fondos adicionales a Caja (no son ganancias)",w.additionalFunding??0],["Salidas desde Caja",w.cashOutgoings],["Vales entregados (incluidos en salidas)",w.advances],["Entradas a sobres",w.deposited],["Gastos directos desde sobres",w.envelopeExpenses],["Traslados de sobres a Caja",w.toCash],["Disponible hoy en sobres de esta semana",w.envelopeBalance],[],["Sobre del día","Recibido + inicial","Gastos directos","A Caja","Saldo actual"],...w.envelopes.map(e=>[e.day,e.deposited+(e.initialAmount??0),e.spent,e.toCash,e.balance]),[],["Movimientos de sobres realizados en la semana"],["Fecha","Sobre de origen / destino","Movimiento","Monto","Saldo antes","Saldo después","Motivo","Referencia"],...w.envelopeMovements.map(m=>[m.day,m.envelopeDay,m.kind==="opening"?"Inicial declarado":m.kind==="deposit"?"De Caja":m.kind==="to_cash"?"A Caja":"Gasto directo",m.amount,m.balanceBefore,m.balanceAfter,m.description,m.id]),[],["Los traslados internos no generan ganancias. El efectivo neto es antes de obligaciones pendientes."]];
+    const sheet=XLSX.utils.aoa_to_sheet(data);sheet["!cols"]=[{wch:46},{wch:30},{wch:24},{wch:18},{wch:18},{wch:18},{wch:45},{wch:30}];for(const key of Object.keys(sheet)){if(!key.startsWith("!")&&sheet[key].t==="n")sheet[key].z='"$"#,##0.00';}XLSX.utils.book_append_sheet(wb,sheet,"Control semanal");
+  }
   wb.Workbook = { Names: [{Name:"_xlnm.Print_Area",Sheet:0,Ref:"Resumen!$A$1:$P$39"}] };
   const files = unzipSync(new Uint8Array(XLSX.write(wb, { type: "array", bookType: "xlsx" })));
   // Apply presentation styles and native editable charts to the exported OOXML.

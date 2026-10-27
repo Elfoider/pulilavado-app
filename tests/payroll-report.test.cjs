@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const ts = require("typescript");
 const React = require("react");
 
-function harness(services = [], cash = { session: null, loading: false, error: "" }) {
+function harness(services = [], cash = { session: null, loading: false, error: "" }, advances = []) {
   let cursor = 0;
   const states = [], tables = [], documents = [], notices = [];
   const hooks = {
@@ -25,6 +25,9 @@ function harness(services = [], cash = { session: null, loading: false, error: "
   let fail = false;
   const localRequire = (name) => {
     if (name === "react") return hooks;
+    if (name === "@/lib/reports/fonts") return {normalFont:"",boldFont:""};
+    if(name === "@/lib/operations/treasury-model")return require("../.test-build/operations/treasury-model.js");
+    if(name === "@/lib/reports/loadTreasury")return {loadTreasuryReport:async()=>undefined};
     if (name === "@/lib/reports/loadCash") return {loadCashReport: async () => ({session: cash.session, movements: []})};
     if (name === "@/lib/reports/excel") return {financialExcel() {}, saveExcel() {}};
     if (name === "@/lib/reports/pdf") {
@@ -40,7 +43,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
       Timestamp: { fromDate: (date) => date },
       async getDocs(path) {
         if (fail) throw new Error("Test read error");
-        return { forEach: (fn) => (path === "services" ? services : []).forEach((s) => fn({ data: () => s })) };
+        return { forEach: (fn) => (path === "services" ? services : path === "cashAdvances" ? advances : []).forEach((s) => fn({ data: () => s })) };
       },
     };
     if (name === "jspdf") return class PDF {
@@ -96,7 +99,7 @@ test("payroll PDF filters by washer identity, recomputes total and retains choic
   await h.refresh();
   assert.equal(h.checks().find((n) => n.props["aria-label"].includes("(b)")).props.checked, false);
   h.button("Reporte de Pago de Nómina").props.onClick();
-  assert.deepEqual(h.tables[0].body, [["Ana", 2, "$7.00", ""]]);
+  assert.deepEqual(h.tables[0].body, [["Ana", 2, "$7.00", "$0.00", "$7.00", "$0.00", ""]]);
   assert.ok(h.documents[0].texts.includes("TOTAL NÓMINA A DISPERSAR: $7.00"));
   assert.match(h.textOf(h.render()), /\$17\.00/); // Full-period payroll KPI is unchanged.
 });
@@ -174,4 +177,14 @@ test("net cash excludes opening fund and paid tips while period cash sales remai
   assert.equal(gross.props.amount, 12);
   cash.session = null;
   assert.match(h.textOf(card()), /Sin caja abierta/);
+});
+
+
+test("payroll deducts identified washer advances and includes advances-only washers without negative pay",async()=>{
+ const h=harness([service("a","Ana",50),service("b","Ana",30)],undefined,[{id:"v1",washerId:"a",washerName:"Ana",amount:20,day:"2026-10-27"},{id:"v2",washerId:"c",washerName:"Luis",amount:10,day:"2026-10-27"}]);
+ await h.refresh();assert.equal(h.checks().length,3);h.button("Reporte de Pago de Nómina").props.onClick();
+ const body=h.tables[0].body;
+ assert.deepEqual(body.find(r=>r[2]==="$50.00"),["Ana",1,"$50.00","$20.00","$30.00","$0.00",""]);
+ assert.deepEqual(body.find(r=>r[0]==="Luis"),["Luis",0,"$0.00","$10.00","$0.00","$10.00",""]);
+ assert.ok(h.documents[0].texts.includes("TOTAL NÓMINA A DISPERSAR: $60.00"));
 });

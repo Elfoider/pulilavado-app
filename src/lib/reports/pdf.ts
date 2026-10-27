@@ -93,6 +93,33 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   text(198, 269, "Caja actual independiente del filtro de ventas", 7, muted, false, true);
   doc.setDrawColor("#D9E4E9"); doc.line(12, 280, 96, 280); doc.line(114, 280, 198, 280);
   text(12, 285, "Preparado por", 8, muted); text(114, 285, "Revisado por", 8, muted);
-  text(12, 293, `Caja: ${report.session?.id ?? "Sin caja abierta"}`, 6, muted); text(198, 293, "1 / 1", 7, muted, false, true);
+  text(12, 293, `Caja: ${report.session?.id ?? "Sin caja abierta"}`, 6, muted); if (!report.weekly) text(198, 293, "1 / 1", 7, muted, false, true);
+  if (report.weekly) {
+    const week=report.weekly;
+    doc.addPage();
+    text(12,18,"Control semanal de efectivo",20,navy,true);
+    text(12,27,`Martes ${week.start} a lunes ${week.end}`,10,muted);
+    autoTable(doc,{startY:34,margin:{left:12,right:12},head:[["Concepto","Monto"]],body:[
+      ["Efectivo neto generado en la semana",dollars(week.netGenerated)],
+      ["Cobros netos en efectivo de la semana",dollars(week.cashReceipts)],
+      ["Fondos adicionales a Caja (no son ganancias)",dollars(week.additionalFunding??0)],
+      ["Salidas de efectivo desde Caja",dollars(week.cashOutgoings)],
+      ["Vales entregados en la semana (incluidos en salidas)",dollars(week.advances)],
+      ["Gastos directos desde sobres",dollars(week.envelopeExpenses)],
+      ["Traslados de sobres a Caja (no son ingresos)",dollars(week.toCash)],
+      ["Disponible hoy en sobres originados esta semana",dollars(week.envelopeBalance)],
+      ["Vales del período para descuento de nómina",dollars(report.advancesTotal??0)],
+      ["Nómina neta del período después de vales",dollars(report.payrollNet??report.payroll)],
+    ],styles:{font:"ReportSans",fontSize:9,cellPadding:2.5},headStyles:{fillColor:navy},columnStyles:{1:{halign:"right"}}});
+    let y=(doc as jsPDF & {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+9;
+    text(12,y,"Sobres de cada día (saldo actual)",12,navy,true);
+    autoTable(doc,{startY:y+4,margin:{left:12,right:12},head:[["Sobre del día","Recibido + inicial","Gastos","A Caja","Disponible"]],body:week.envelopes.length?week.envelopes.map(e=>[e.day,dollars(e.deposited+(e.initialAmount??0)),dollars(e.spent),dollars(e.toCash),dollars(e.balance)]):[["Sin sobres registrados","-","-","-","-"]],styles:{font:"ReportSans",fontSize:8,cellPadding:2.5},headStyles:{fillColor:green}});
+    y=(doc as jsPDF & {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+10;
+    if(y>238){doc.addPage();y=20;}
+    text(12,y,"Retiros y depósitos de sobres realizados en la semana",11,navy,true);
+    autoTable(doc,{startY:y+4,margin:{left:12,right:12,bottom:18},head:[["Fecha","Sobre","Destino / origen","Monto","Antes","Después","Motivo"]],body:week.envelopeMovements.length?week.envelopeMovements.map(m=>[m.day,m.envelopeDay,m.kind==="opening"?"Inicial declarado":m.kind==="deposit"?"De Caja":m.kind==="to_cash"?"A Caja":"Gasto directo",dollars(m.amount),dollars(m.balanceBefore),dollars(m.balanceAfter),m.description]):[["Sin movimientos","","","","","",""]],styles:{font:"ReportSans",fontSize:7,cellPadding:2},headStyles:{fillColor:navy},columnStyles:{6:{cellWidth:48}}});
+    const pages=doc.getNumberOfPages();
+    for(let page=1;page<=pages;page++){doc.setPage(page);text(198,293,`${page} / ${pages}`,7,muted,false,true);if(page>1)text(12,287,"Flujo de efectivo, antes de obligaciones pendientes. Saldos de sobres consultados al generar.",7,muted);}
+  }
   return doc;
 }

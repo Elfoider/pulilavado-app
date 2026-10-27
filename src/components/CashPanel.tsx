@@ -38,10 +38,12 @@ export default function CashPanel() {
   const [opening, setOpening] = useState("0"),
     [counted, setCounted] = useState(""),
     [notes, setNotes] = useState("");
+  const washers = useCollection<Data & {id:string}>("washers");
+  const [washerId, setWasherId] = useState("");
   const [move, setMove] = useState({
     amount: "",
     method: "Efectivo",
-    kind: "expense" as "expense" | "income" | "withdrawal",
+    kind: "expense" as "expense" | "income" | "withdrawal" | "advance",
     description: "",
   });
   const [openingId, setOpeningId] = useState(newId),
@@ -75,9 +77,10 @@ export default function CashPanel() {
         <div>
           <h1 className="text-3xl font-black">Caja</h1>
           <p className="text-gray-600">
-            Apertura, cobros, gastos, arqueo y cierre.
+            Apertura, cobros, gastos, vales, arqueo y cierre.
           </p>
         </div>
+        <Link href="/envelopes" className="text-emerald-700 font-bold self-center">Sobres y resumen semanal →</Link>
         <Link href="/sales" className="text-cyan-700 font-bold self-center">
           Vender productos →
         </Link>
@@ -178,7 +181,8 @@ export default function CashPanel() {
           onSubmit={(e) => {
             e.preventDefault();
             void run(async () => {
-              await operations.cashMove(
+              if (move.kind === "advance") await operations.registerAdvance(washerId, Number(move.amount), move.description, moveId);
+              else await operations.cashMove(
                 Number(move.amount),
                 move.method,
                 move.kind,
@@ -198,16 +202,18 @@ export default function CashPanel() {
               value={move.kind}
               onChange={(e) => {
                 setMoveId(newId());
-                setMove({ ...move, kind: e.target.value as typeof move.kind });
+                setMove({ ...move, kind: e.target.value as typeof move.kind, method: e.target.value === "advance" ? "Efectivo" : move.method });
               }}
               className="border rounded-lg p-2"
             >
               <option value="expense">Gasto</option>
               <option value="withdrawal">Retiro / pago a lavador</option>
               <option value="income">Ingreso adicional</option>
+              <option value="advance">Vale / adelanto a lavador</option>
             </select>
             <select
               aria-label="Método del movimiento"
+              disabled={move.kind === "advance"}
               value={move.method}
               onChange={(e) => {
                 setMoveId(newId());
@@ -245,6 +251,7 @@ export default function CashPanel() {
               className="border rounded-lg p-2"
             />
           </div>
+          {move.kind === "advance" && <label className="block text-sm">Lavador del vale<select required value={washerId} onChange={e => {setWasherId(e.target.value);setMoveId(newId());}} aria-label="Lavador del vale" className="block border rounded-lg p-2 w-full max-w-md"><option value="">Seleccione un lavador</option>{washers.data.filter(w=>w.active!==false).map(w=><option key={w.id} value={w.id}>{String(w.name ?? "Sin nombre")}</option>)}</select><span className="text-gray-500">Se entrega en efectivo y se descuenta de sus comisiones en el reporte del período.</span>{washers.error && <span role="alert" className="text-red-700">{washers.error}</span>}</label>}
           <button
             disabled={busy}
             className="bg-gray-800 text-white px-5 py-2 rounded-lg disabled:opacity-50"
@@ -352,6 +359,7 @@ export default function CashPanel() {
               className="bg-white border rounded-2xl p-5 space-y-3"
             >
               <h2 className="text-xl font-bold">Arqueo y cierre</h2>
+              {session.balances.Efectivo > session.openingAmount && <p className="text-sm text-gray-500">Si va a guardar el efectivo de la jornada, regístrelo en <Link href="/envelopes" className="underline text-emerald-700">Sobres con dinero</Link> antes de cerrar esta caja.</p>}
               <label className="block text-sm">
                 Efectivo físico contado ($)
                 <input

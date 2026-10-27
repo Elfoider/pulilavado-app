@@ -20,6 +20,7 @@ import {
 
 // --- IMPORTAR LIBRERÍAS DE PDF ---
 import jsPDF from "jspdf";
+import { normalFont, boldFont } from "@/lib/reports/fonts";
 import autoTable from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
@@ -28,16 +29,20 @@ import { loadCashReport } from "@/lib/reports/loadCash";
 import { financialPDF } from "@/lib/reports/pdf";
 import { financialExcel, saveExcel } from "@/lib/reports/excel";
 import { type FinancialReport } from "@/lib/reports/cash";
-
-const dateInputValue = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from "@/lib/operations/treasury-model";
+import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
+import { type TreasuryReport } from "@/lib/reports/treasury";
+import Link from "next/link";
 
 // Interfaces
 interface PayrollItem {
   washerId: string;
   washerName: string;
   count: number;
-  totalPay: number; // Solo comisión
+  totalPay: number; // Comisión bruta
+  advances: number;
+  netPay: number;
+  excess: number;
 }
 
 export default function ReportsPage() {
@@ -49,10 +54,10 @@ export default function ReportsPage() {
     "today",
   );
   const [customStart, setCustomStart] = useState<string>(
-    dateInputValue(new Date()),
+    businessDay(),
   );
   const [customEnd, setCustomEnd] = useState<string>(
-    dateInputValue(new Date()),
+    businessDay(),
   );
 
   // ESTADOS FINANCIEROS
@@ -84,17 +89,21 @@ export default function ReportsPage() {
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
   const [totalPayrollToPay, setTotalPayrollToPay] = useState(0);
+  const [advanceRows, setAdvanceRows] = useState<CashAdvance[]>([]);
+  const [weekly, setWeekly] = useState<TreasuryReport>();
   const [excludedWasherIds, setExcludedWasherIds] = useState<string[]>([]);
   const [reportError, setReportError] = useState("");
   const [loadedReportKey, setLoadedReportKey] = useState("");
   const reportRequest = useRef(0);
-  const reportKey = `${filterType}|${customStart}|${customEnd}`;
+  const displayedStart = filterType === "custom" ? customStart : filterType === "week" ? weekOf(businessDay()) : businessDay();
+  const displayedEnd = filterType === "custom" ? customEnd : businessDay();
+  const reportKey = `${filterType}|${displayedStart}|${displayedEnd}`;
   const reportReady = !loading && !reportError && loadedReportKey === reportKey;
   const selectedPayroll = payrollList.filter(
     (item) => !excludedWasherIds.includes(item.washerId),
   );
   const selectedPayrollTotal = selectedPayroll.reduce(
-    (sum, item) => sum + item.totalPay, 0,
+    (sum, item) => sum + item.netPay, 0,
   );
 
   // --- FUNCIÓN DE CÁLCULO (IGUAL QUE ANTES) ---
@@ -103,59 +112,12 @@ export default function ReportsPage() {
     setLoading(true);
     setReportError("");
     try {
-      let startDate = new Date();
-      let endDate = new Date();
-
-      if (filterType === "today") {
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        setCustomStart(dateInputValue(startDate));
-        setCustomEnd(dateInputValue(startDate));
-      } else if (filterType === "week") {
-        const today = new Date();
-        const currentDay = today.getDay(); // 0=Domingo, 1=Lunes, 2=Martes...
-
-        // OBJETIVO: Encontrar el último Martes (Día 2)
-        // Si hoy es Martes (2), la distancia es 0.
-        // Si hoy es Miércoles (3), la distancia es 1 día atrás.
-        // Si hoy es Lunes (1), el martes pasado fue hace 6 días.
-        // Si hoy es Domingo (0), el martes pasado fue hace 5 días.
-
-        const cycleStartDay = 2; // 2 = Martes
-        let daysToSubtract = 0;
-
-        if (currentDay >= cycleStartDay) {
-          // Estamos dentro de la misma semana calendario (ej: Hoy es Jueves)
-          // Jueves (4) - Martes (2) = 2 días atrás
-          daysToSubtract = currentDay - cycleStartDay;
-        } else {
-          // Ya cruzamos al inicio de la semana calendario (ej: Hoy es Lunes o Domingo)
-          // Necesitamos ir al Martes de la semana ANTERIOR.
-          // Fórmula: (DíaActual - DíaMeta) + 7
-          // Ej Lunes (1): (1 - 2) + 7 = 6 días atrás
-          daysToSubtract = currentDay - cycleStartDay + 7;
-        }
-
-        // 1. Configurar Fecha de Inicio (El Martes calculado)
-        startDate = new Date(today);
-        startDate.setDate(today.getDate() - daysToSubtract);
-        startDate.setHours(0, 0, 0, 0); // Martes 00:00:00
-
-        // 2. Configurar Fecha Fin (Hoy, hasta el momento actual)
-        endDate = new Date(today);
-        endDate.setHours(0, 0, 0, 0);
-        setCustomStart(dateInputValue(startDate));
-        setCustomEnd(dateInputValue(endDate));
-        endDate.setHours(23, 59, 59, 999); // Hoy 23:59:59
-      } else if (filterType === "custom") {
-        // FECHA INICIO (00:00:00)
-        const [y1, m1, d1] = customStart.split("-").map(Number);
-        startDate = new Date(y1, m1 - 1, d1, 0, 0, 0);
-
-        // FECHA FIN (23:59:59)
-        const [y2, m2, d2] = customEnd.split("-").map(Number);
-        endDate = new Date(y2, m2 - 1, d2, 23, 59, 59, 999);
-      }
+      const today = businessDay();
+      const start = filterType === "custom" ? customStart : filterType === "week" ? weekOf(today) : today;
+      const end = filterType === "custom" ? customEnd : today;
+      if (start > end) throw new Error("La fecha inicial no puede ser posterior a la final.");
+      const startDate = dayStart(start);
+      const endDate = new Date(dayStart(addDays(end, 1)).getTime() - 1);
 
       const q = query(
         collection(db, "services"),
@@ -225,7 +187,7 @@ export default function ReportsPage() {
 
           // Nómina
           if (!washerMap[washerId]) {
-            washerMap[washerId] = { washerId, washerName, count: 0, totalPay: 0 };
+            washerMap[washerId] = { washerId, washerName, count: 0, totalPay: 0, advances: 0, netPay: 0, excess: 0 };
           }
           washerMap[washerId].count += 1;
           washerMap[washerId].totalPay += washerEarn;
@@ -234,7 +196,20 @@ export default function ReportsPage() {
 
       const salesSnap = await getDocs(query(collection(db, "sales"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
       salesSnap.forEach(s => { const sale = s.data(); if (sale.status !== "paid") return; const total = Number(sale.total || 0); tempServiceSales += total; tempBusiness += total; const pm = sale.paymentMethod as keyof typeof tempIncomeMethod; if (tempIncomeMethod[pm] !== undefined) tempIncomeMethod[pm] += total; });
+      const advanceSnap = await getDocs(query(collection(db, "cashAdvances"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
+      const periodAdvances: CashAdvance[] = [];
+      advanceSnap.forEach(doc => {
+        const advance = { ...doc.data(), id: doc.id } as CashAdvance;
+        if (!advance.washerId || !Number.isFinite(advance.amount) || advance.amount <= 0) throw new Error("Hay vales con datos inválidos.");
+        periodAdvances.push(advance);
+        if (!washerMap[advance.washerId]) washerMap[advance.washerId] = {washerId: advance.washerId, washerName: advance.washerName, count: 0, totalPay: 0, advances: 0, netPay: 0, excess: 0};
+        washerMap[advance.washerId].advances += advance.amount;
+      });
+      Object.values(washerMap).forEach(item => { const result = netPayroll(item.totalPay,item.advances); item.netPay=result.pay; item.excess=result.excess; });
+      const weekSummary = await loadTreasuryReport(end);
       if (requestId !== reportRequest.current) return;
+      setAdvanceRows(periodAdvances);
+      setWeekly(weekSummary);
       setServiceSales(tempServiceSales);
       setTotalTips(tempTips);
       setNetBusinessProfit(tempBusiness);
@@ -247,7 +222,7 @@ export default function ReportsPage() {
       setTotalPayrollToPay(
         payrollArray.reduce((acc, curr) => acc + curr.totalPay, 0),
       );
-      setLoadedReportKey(`${filterType}|${customStart}|${customEnd}`);
+      setLoadedReportKey(`${filterType}|${start}|${end}`);
     } catch (error) {
       if (requestId !== reportRequest.current) return;
       setReportError("No se pudo cargar el reporte. Vuelva a actualizarlo antes de generar la nómina.");
@@ -270,20 +245,23 @@ export default function ReportsPage() {
       return;
     }
     const doc = new jsPDF();
-    const todayStr = new Date().toLocaleDateString();
+    doc.addFileToVFS("ReportSans.ttf", normalFont); doc.addFont("ReportSans.ttf", "ReportSans", "normal");
+    doc.addFileToVFS("ReportSans-Bold.ttf", boldFont); doc.addFont("ReportSans-Bold.ttf", "ReportSans", "bold");
+    doc.setFont("ReportSans", "normal");
+    const todayStr = businessDay();
     const rangeStr =
       filterType === "custom"
         ? `Del ${customStart} al ${customEnd}`
         : filterType === "today"
           ? todayStr
-          : "Semana Actual";
+          : `Del ${weekOf(businessDay())} al ${businessDay()}`;
     // Encabezado
     doc.setFontSize(18);
     doc.text("MR. ESPUMA - REPORTE DE NÓMINA", 14, 20);
     doc.setFontSize(10);
     doc.text(`Periodo: ${rangeStr}`, 14, 28);
     doc.text(
-      "Concepto: Pago de Comisiones (Propinas pagadas diariamente)",
+      "Comisiones menos vales del período. No incluye propinas.",
       14,
       34,
     );
@@ -293,12 +271,17 @@ export default function ReportsPage() {
       item.washerName,
       item.count,
       `${formatMoney(item.totalPay)}`,
+      `${formatMoney(item.advances)}`,
+      `${formatMoney(item.netPay)}`,
+      `${formatMoney(item.excess)}`,
       "",
     ]);
 
     autoTable(doc, {
       startY: 40,
-      head: [["Lavador", "Autos Lavados", "A Pagar", "Firma de Recibido"]],
+      margin: { bottom: 35 },
+      styles: { font: "ReportSans", fontSize: 9 },
+      head: [["Lavador", "Autos", "Comisiones", "Menos vales", "A pagar", "Excedente de vales", "Firma"]],
       body: tableData,
       theme: "grid",
       headStyles: { fillColor: [41, 128, 185] }, // Color Azul
@@ -307,13 +290,17 @@ export default function ReportsPage() {
     // Totales
     const finalY = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
     doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
+    doc.setFont("ReportSans", "bold");
     doc.text(
       `TOTAL NÓMINA A DISPERSAR: ${formatMoney(selectedPayrollTotal)}`,
       14,
       finalY,
     );
 
+    doc.setFontSize(9);
+    doc.setFont("ReportSans", "normal");
+    doc.text(`Vales registrados en esta selección: ${formatMoney(selectedPayroll.reduce((sum,item)=>sum+item.advances,0))}`,14,finalY+8);
+    doc.text("El excedente indica vales que superan las comisiones del período.",14,finalY+14);
     doc.save(`Nomina_MrEspuma_${todayStr}.pdf`);
     enqueueSnackbar("Reporte de nómina generado exitosamente.", {
       variant: "success",
@@ -335,12 +322,14 @@ export default function ReportsPage() {
       if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
       const report: FinancialReport = {
         ...snapshot,
-        period: filterType === "today" ? `Ventas del día: ${dateInputValue(new Date())}` : filterType === "week" ? "Ventas de los últimos 7 días" : `Ventas: ${customStart} a ${customEnd}`,
-        generatedAt: new Date().toLocaleString(),
+        period: filterType === "today" ? `Ventas del día: ${businessDay()}` : filterType === "week" ? `Ventas: ${weekOf(businessDay())} a ${businessDay()}` : `Ventas: ${customStart} a ${customEnd}`,
+        generatedAt: new Date().toLocaleString("es", {timeZone:"America/Caracas"}),
         sales: serviceSales, business: netBusinessProfit, payroll: totalPayrollToPay,
         income: incomeByMethod, tips: tipsByMethod,
+        advanceRows, advancesTotal: advanceRows.reduce((sum,a)=>sum+a.amount,0), payrollNet: payrollList.reduce((sum,p)=>sum+p.netPay,0), weekly: await loadTreasuryReport(filterType === "custom" ? customEnd : businessDay()),
       };
-      const date = dateInputValue(new Date());
+      if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
+      const date = businessDay();
       if (format === "pdf") financialPDF(report).save(`Financiero_${date}.pdf`);
       else saveExcel(financialExcel(report), `Financiero_${date}.xlsx`);
       enqueueSnackbar("Reporte financiero generado.", { variant: "success" });
@@ -386,8 +375,9 @@ export default function ReportsPage() {
               </span>
               <input
                 type="date"
-                value={customStart}
+                value={displayedStart}
                 onChange={(e) => {
+                  if (filterType !== "custom") setCustomEnd(displayedEnd);
                   setCustomStart(e.target.value);
                   setFilterType("custom"); // Activa modo custom automáticamente
                 }}
@@ -404,8 +394,9 @@ export default function ReportsPage() {
               </span>
               <input
                 type="date"
-                value={customEnd}
+                value={displayedEnd}
                 onChange={(e) => {
+                  if (filterType !== "custom") setCustomStart(displayedStart);
                   setCustomEnd(e.target.value);
                   setFilterType("custom");
                 }}
@@ -479,9 +470,9 @@ export default function ReportsPage() {
             Nómina a Pagar
           </p>
           <h3 className="text-3xl font-black text-orange-700">
-            {formatMoney(totalPayrollToPay)}
+            {formatMoney(payrollList.reduce((sum,item)=>sum+item.netPay,0))}
           </h3>
-          <p className="text-orange-600/70 text-xs mt-1">Solo comisiones</p>
+          <p className="text-orange-600/70 text-xs mt-1">Comisiones menos vales del período</p>
         </div>
       </div>
 
@@ -591,20 +582,21 @@ export default function ReportsPage() {
         {!reportReady ? <p className="text-sm text-gray-500">{reportError ? "Actualice el reporte para continuar." : "Cargando nómina del período…"}</p> : payrollList.length === 0 ? <p className="text-sm text-gray-500">No hay lavadores con servicios cobrados en este período.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b text-left"><th className="p-3">Incluir</th><th className="p-3">Lavador</th><th className="p-3 text-right">Autos lavados</th><th className="p-3 text-right">Comisión a pagar</th></tr></thead>
+              <thead><tr className="border-b text-left"><th className="p-3">Incluir</th><th className="p-3">Lavador</th><th className="p-3 text-right">Autos lavados</th><th className="p-3 text-right">Comisiones</th><th className="p-3 text-right">Vales</th><th className="p-3 text-right">A pagar</th><th className="p-3 text-right">Excedente de vales</th></tr></thead>
               <tbody>{payrollList.map((item) => (
                 <tr key={item.washerId} className="border-b">
                   <td className="p-3"><input type="checkbox" aria-label={`Incluir a ${item.washerName} en la nómina (${item.washerId})`} checked={!excludedWasherIds.includes(item.washerId)} onChange={(e) => setExcludedWasherIds((previous) => e.target.checked ? previous.filter((id) => id !== item.washerId) : [...previous, item.washerId])} className="h-5 w-5 accent-cyan-700" /></td>
-                  <td className="p-3 font-medium">{item.washerName}</td><td className="p-3 text-right">{item.count}</td><td className="p-3 text-right whitespace-nowrap">{formatMoney(item.totalPay)}</td>
+                  <td className="p-3 font-medium">{item.washerName}</td><td className="p-3 text-right">{item.count}</td><td className="p-3 text-right whitespace-nowrap">{formatMoney(item.totalPay)}</td><td className="p-3 text-right">{formatMoney(item.advances)}</td><td className="p-3 text-right font-bold">{formatMoney(item.netPay)}</td><td className="p-3 text-right">{formatMoney(item.excess)}</td>
                 </tr>
               ))}</tbody>
             </table>
           </div>
         )}
         {reportReady && <p className="font-bold text-gray-800">Seleccionados: {selectedPayroll.length} de {payrollList.length} · Total a pagar: {formatMoney(selectedPayrollTotal)}</p>}
-        <p className="text-xs text-gray-500">Generar el reporte no registra el pago. Para entregar el dinero, registre el retiro correspondiente en Caja.</p>
+        <p className="text-xs text-gray-500">Generar el reporte no registra el pago. Los vales se descuentan por fecha del período seleccionado. Para entregar el saldo neto, registre solo ese monto como retiro en Caja; no registre de nuevo los vales.</p>
       </section>
 
+      {weekly && reportReady && <section className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 space-y-3"><div className="flex justify-between gap-3 flex-wrap"><h3 className="font-bold text-lg">Control semanal: {weekly.start} a {weekly.end}</h3><Link href="/envelopes" className="text-emerald-800 underline">Ver sobres con dinero</Link></div><div className="grid sm:grid-cols-3 gap-3"><p>Efectivo neto generado<br/><strong className="text-xl">{formatMoney(weekly.netGenerated)}</strong></p><p>Vales entregados<br/><strong className="text-xl">{formatMoney(weekly.advances)}</strong></p><p>Disponible hoy en sobres de esa semana<br/><strong className="text-xl">{formatMoney(weekly.envelopeBalance)}</strong></p></div><p className="text-xs text-emerald-800">Semana de martes a lunes. El efectivo neto excluye fondos y traslados internos e incluye las salidas ya registradas. No equivale a utilidad después de obligaciones pendientes.</p></section>}
       {/* BOTONES PDF */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         <button
