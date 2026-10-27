@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import { normalFont, boldFont } from "./fonts";
 import autoTable from "jspdf-autotable";
 import { METHODS } from "../operations/model";
-import { cashTotals, FinancialReport } from "./cash";
+import { reportCashView, FinancialReport, movementKinds } from "./cash";
 const dollars = (n: number) => `$${n.toFixed(2)}`;
 export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   doc.addFileToVFS("ReportSans.ttf", normalFont); doc.addFont("ReportSans.ttf", "ReportSans", "normal");
@@ -33,18 +33,19 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
     doc.setFillColor(bg); doc.circle(x, y, radius * .65, "F");
     doc.setFont("ReportSans", "bold"); doc.setFontSize(9); doc.setTextColor(fg); doc.text(center, x, y + 1, { align: "center" });
   };
-  const cash = report.session ? cashTotals(report.session, report.currentSessionMovements ?? report.movements) : null;
-  const cashLabel = report.session ? dollars(report.session.balances.Efectivo) : "Sin caja abierta";
-  const netLabel = cash ? dollars(cash.net) : "Sin caja abierta";
+  const cash = reportCashView(report);
+  const cashLabel = cash.balance === null ? "No disponible" : dollars(cash.balance);
+  const netLabel = dollars(cash.net);
+  const periodMode = !!report.periodCash;
   box(0, 0, 210, 3, cyan);
   text(12, 15, "MR. ESPUMA / PULILAVADO", 10, cyan, true);
   text(12, 28, "Reporte financiero", 24, navy, true);
   text(12, 36, report.period, 10, muted);
-  text(198, 36, report.session ? "Caja abierta" : "Sin caja abierta", 9, green, true, true);
+
   text(12, 42, `Generado: ${report.generatedAt}`, 7, muted);
   box(12, 48, 186, 33, green);
   text(18, 57, "EFECTIVO A GUARDAR DE LA JORNADA", 11, "#FFFFFF", true);
-  text(18, 73, netLabel, report.session ? 30 : 20, "#FFFFFF", true);
+  text(18, 73, netLabel, 30, "#FFFFFF", true);
   text(18, 78, "SIN FONDO INICIAL", 7, "#D8F1E6", true);
   if (cash && cash.reconciled && cash.net >= 0 && cash.outgoing >= 0 && cash.incoming > 0) {
     text(151, 55, "EFECTIVO DE LA JORNADA", 6, "#FFFFFF", true);
@@ -53,8 +54,8 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
     text(174, 69, `Salidas ${dollars(cash.outgoing)}`, 7, "#FFFFFF");
   }
   box(12, 85, 91, 24, "#F2F6F8"); box(107, 85, 91, 24, "#F2F6F8");
-  text(17, 92, "SALDO TOTAL EN CAJA", 9, muted, true); text(17, 103, cashLabel, 21, navy, true);
-  text(98, 103, "Incluye fondo", 7, muted, false, true);
+  text(17, 92, periodMode ? "SALDOS FINALES DEL PERÍODO" : "SALDO TOTAL EN CAJA", 9, muted, true); text(17, 103, cashLabel, 21, navy, true);
+  text(98, 103, periodMode ? "Acumulado" : "Incluye fondo", 7, muted, false, true);
   text(112, 92, "VENTAS DEL PERÍODO", 9, muted, true); text(112, 103, dollars(report.sales), 21, navy, true);
   text(193, 103, "Servicios y productos", 7, muted, false, true);
   text(12, 120, "01  Cobros por método", 12, navy, true);
@@ -80,20 +81,20 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   text(113, 204, "03  Comisiones y propinas", 12, navy, true);
   box(12, 209, 96, 51, "#F2F6F8"); box(113, 209, 85, 51, "#F2F6F8");
   const left = [
-    ["Fondo inicial", report.session ? dollars(report.session.openingAmount) : "No disponible"],
+    [periodMode ? "Fondos iniciales acumulados" : "Fondo inicial", cash.opening === null ? "No disponible" : dollars(cash.opening)],
     ["Entradas netas en efectivo", cash?.reconciled ? dollars(cash.incoming) : "No disponible"],
     ["Pagos y gastos en efectivo", cash?.reconciled ? dollars(cash.outgoing) : "No disponible"],
-    ["Saldo total en caja", cashLabel],
+    [periodMode ? "Saldos finales acumulados" : "Saldo total en caja", cashLabel],
     ["Efectivo a guardar de la jornada", netLabel],
   ];
   left.forEach(([label, value], i) => { text(16, 217 + i * 8, label, 8, i === 4 ? green : navy, i >= 3); text(104, 217 + i * 8, value, 10, i === 4 ? green : navy, i >= 3, true); });
   [["Comisiones generadas", dollars(report.payroll)], ["Ventas menos comisiones", dollars(report.business)], ["Propinas recibidas", dollars(totalTips)], ["Salidas de efectivo", cash?.reconciled ? dollars(cash.outgoing) : "No disponible"]].forEach(([label, value], i) => { text(117, 217 + i * 8, label, 8); text(194, 217 + i * 8, value, 9, navy, i === 1, true); });
   text(117, 253, "Antes de costos y gastos.", 7, muted);
-  text(12, 269, "Arqueo físico: pendiente", 8, muted);
-  text(198, 269, "Caja actual independiente del filtro de ventas", 7, muted, false, true);
+  text(12, 269, periodMode ? report.periodCash?.statusLabel ?? `${cash.sessionCount} caja(s) con movimientos en el período` : report.session?.status === "open" ? "Caja abierta" : "Caja cerrada / sin apertura", 8, muted);
+  text(198, 269, periodMode ? "Saldos al último movimiento del rango" : "Datos de la caja consultada", 7, muted, false, true);
   doc.setDrawColor("#D9E4E9"); doc.line(12, 280, 96, 280); doc.line(114, 280, 198, 280);
   text(12, 285, "Preparado por", 8, muted); text(114, 285, "Revisado por", 8, muted);
-  text(12, 293, `Caja: ${report.session?.id ?? "Sin caja abierta"}`, 6, muted); if (!report.weekly) text(198, 293, "1 / 1", 7, muted, false, true);
+  text(12, 293, periodMode ? "Fondos y saldos acumulados por caja; no equivalen a efectivo físico conjunto." : `Caja: ${report.session?.id ?? "Sin apertura registrada"}`, 6, muted); if (!report.weekly && !periodMode) text(198, 293, "1 / 1", 7, muted, false, true);
   if (report.weekly) {
     const week=report.weekly;
     doc.addPage();
@@ -118,8 +119,25 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
     if(y>238){doc.addPage();y=20;}
     text(12,y,"Retiros y depósitos de sobres realizados en la semana",11,navy,true);
     autoTable(doc,{startY:y+4,margin:{left:12,right:12,bottom:18},head:[["Fecha","Sobre","Destino / origen","Monto","Antes","Después","Motivo"]],body:week.envelopeMovements.length?week.envelopeMovements.map(m=>[m.day,m.envelopeDay,m.kind==="opening"?"Inicial declarado":m.kind==="deposit"?"De Caja":m.kind==="to_cash"?"A Caja":"Gasto directo",dollars(m.amount),dollars(m.balanceBefore),dollars(m.balanceAfter),m.description]):[["Sin movimientos","","","","","",""]],styles:{font:"ReportSans",fontSize:7,cellPadding:2},headStyles:{fillColor:navy},columnStyles:{6:{cellWidth:48}}});
+  }
+  if (periodMode) {
+    doc.addPage();
+    text(12, 18, "Movimientos de caja del período", 18, navy, true);
+    text(12, 27, report.period, 9, muted);
+    autoTable(doc, { startY: 34, margin: { left: 12, right: 12, bottom: 20 },
+      head: [["Fecha / Caja", "Movimiento / motivo", "Método", "Monto", "Antes", "Después"]],
+      body: report.movements.length ? report.movements.map(m => [
+        `${m.createdAt ? new Date(m.createdAt.seconds * 1000).toLocaleString("es-VE", {timeZone:"America/Caracas"}) : "Sin fecha"}\n${m.sessionId}`,
+        `${movementKinds[m.kind] ?? m.kind}\n${m.description}\nSaldos: ${m.balanceSource}`,
+        m.method, dollars(m.amount), m.balancesBefore ? dollars(m.balancesBefore[m.method]) : "No disponible", m.balancesAfter ? dollars(m.balancesAfter[m.method]) : "No disponible",
+      ]) : [["Sin movimientos en el período", "", "", "", "", ""]],
+      styles: {font:"ReportSans",fontSize:7,cellPadding:2}, headStyles:{fillColor:navy},
+      columnStyles:{0:{cellWidth:42},1:{cellWidth:60}}, rowPageBreak:"avoid",
+    });
+  }
+  if (report.weekly || periodMode) {
     const pages=doc.getNumberOfPages();
-    for(let page=1;page<=pages;page++){doc.setPage(page);text(198,293,`${page} / ${pages}`,7,muted,false,true);if(page>1)text(12,287,"Flujo de efectivo, antes de obligaciones pendientes. Saldos de sobres consultados al generar.",7,muted);}
+    for(let page=1;page<=pages;page++){doc.setPage(page);text(198,293,`${page} / ${pages}`,7,muted,false,true);}
   }
   return doc;
 }

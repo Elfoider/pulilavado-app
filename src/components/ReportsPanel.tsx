@@ -24,11 +24,10 @@ import { normalFont, boldFont } from "@/lib/reports/fonts";
 import autoTable, { type RowInput } from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
-import { useCurrentCash } from "@/lib/useCurrentCash";
 import { loadCashReport } from "@/lib/reports/loadCash";
 import { financialPDF } from "@/lib/reports/pdf";
 import { financialExcel, saveExcel } from "@/lib/reports/excel";
-import { type FinancialReport } from "@/lib/reports/cash";
+import { type PeriodCash, type FinancialReport } from "@/lib/reports/cash";
 import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from "@/lib/operations/treasury-model";
 import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
 import { type TreasuryReport } from "@/lib/reports/treasury";
@@ -79,12 +78,7 @@ export default function ReportsPage() {
     Transferencia: 0,
   });
 
-  // CAJA REAL
-  const cash = useCurrentCash();
-  const cashLabel = cash.loading ? "Cargando…" : cash.error ? "No disponible" : cash.session ? formatMoney(cash.session.balances.Efectivo) : "Sin caja abierta";
-  const netCashLabel = cash.session && !cash.loading && !cash.error
-    ? formatMoney(cash.session.balances.Efectivo - cash.session.openingAmount)
-    : cashLabel;
+  const [periodCash, setPeriodCash] = useState<PeriodCash>();
 
   // NÓMINA
   const [payrollList, setPayrollList] = useState<PayrollItem[]>([]);
@@ -99,6 +93,8 @@ export default function ReportsPage() {
   const displayedEnd = filterType === "custom" ? customEnd : businessDay();
   const reportKey = `${filterType}|${displayedStart}|${displayedEnd}`;
   const reportReady = !loading && !reportError && loadedReportKey === reportKey;
+  const cashLabel = !reportReady ? "—" : periodCash?.balance == null ? "No disponible" : formatMoney(periodCash.balance);
+  const netCashLabel = !reportReady ? "—" : formatMoney(periodCash?.net ?? 0);
   const selectedPayroll = payrollList.filter(
     (item) => !excludedWasherIds.includes(item.washerId),
   );
@@ -206,8 +202,9 @@ export default function ReportsPage() {
         washerMap[advance.washerId].advances += advance.amount;
       });
       Object.values(washerMap).forEach(item => { const result = netPayroll(item.totalPay,item.advances); item.netPay=result.pay; item.excess=result.excess; });
-      const weekSummary = await loadTreasuryReport(end);
+      const [cashSnapshot, weekSummary] = await Promise.all([loadCashReport({start, end}), filterType === "week" ? loadTreasuryReport(end) : Promise.resolve(undefined)]);
       if (requestId !== reportRequest.current) return;
+      setPeriodCash(cashSnapshot.periodCash);
       setAdvanceRows(periodAdvances);
       setWeekly(weekSummary);
       setServiceSales(tempServiceSales);
@@ -316,14 +313,14 @@ export default function ReportsPage() {
   // 2. GENERAR PDF FINANCIERO (GERENCIAL)
   // ==========================================
   const exportFinancial = async (format: "pdf" | "excel") => {
-    if (!reportReady || cash.loading || cash.error || exporting) {
-      enqueueSnackbar("Espere a que se carguen el reporte y el saldo de Caja.", { variant: "warning" });
+    if (!reportReady || exporting) {
+      enqueueSnackbar("Espere a que se cargue el reporte del período.", { variant: "warning" });
       return;
     }
     setExporting(true);
     const request = reportRequest.current;
     try {
-      const snapshot = await loadCashReport(format === "excel" ? { start: displayedStart, end: displayedEnd } : undefined);
+      const snapshot = await loadCashReport({ start: displayedStart, end: displayedEnd });
       if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
       const report: FinancialReport = {
         ...snapshot,
@@ -331,7 +328,7 @@ export default function ReportsPage() {
         generatedAt: new Date().toLocaleString("es", {timeZone:"America/Caracas"}),
         sales: serviceSales, business: netBusinessProfit, payroll: totalPayrollToPay,
         income: incomeByMethod, tips: tipsByMethod,
-        advanceRows, advancesTotal: advanceRows.reduce((sum,a)=>sum+a.amount,0), payrollNet: payrollList.reduce((sum,p)=>sum+p.netPay,0), weekly: await loadTreasuryReport(filterType === "custom" ? customEnd : businessDay()),
+        advanceRows, advancesTotal: advanceRows.reduce((sum,a)=>sum+a.amount,0), payrollNet: payrollList.reduce((sum,p)=>sum+p.netPay,0), weekly: filterType === "week" ? await loadTreasuryReport(displayedEnd) : undefined,
       };
       if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
       const date = businessDay();
@@ -429,14 +426,14 @@ export default function ReportsPage() {
           </div>
           <div className="relative z-10">
             <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">
-              Efectivo en caja actual
+              Saldos finales acumulados del período
             </p>
             <h3 className="text-4xl font-black tracking-tight">
               {cashLabel}
             </h3>
             <div className="mt-3 flex items-center gap-2 text-xs text-red-300 bg-red-500/10 p-1.5 rounded w-fit">
               <TrendingUp className="w-3 h-3 rotate-180" />
-              <span>Fondo + entradas − gastos y retiros</span>
+              <span>Saldos al último movimiento de cada caja en el rango</span>
             </div>
           </div>
         </div>
@@ -446,6 +443,7 @@ export default function ReportsPage() {
             Efectivo a guardar de la jornada
           </p>
           <h3 className="text-3xl font-black text-emerald-900">{netCashLabel}</h3>
+          {reportReady && <p className="text-xs text-gray-500 mt-2">{periodCash?.statusLabel ?? `${periodCash?.sessionCount ?? 0} caja(s) con movimientos en el período`}</p>}
         </div>
 
         <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">
@@ -630,7 +628,7 @@ export default function ReportsPage() {
 
         <button
           onClick={() => exportFinancial("pdf")}
-          disabled={!reportReady || cash.loading || !!cash.error || exporting}
+          disabled={!reportReady || exporting}
           className="group relative overflow-hidden bg-gray-800 text-white py-4 rounded-xl font-bold hover:bg-black transition flex flex-col items-center justify-center gap-1 shadow-lg shadow-gray-400/20"
         >
           <div className="flex items-center gap-2">
@@ -641,7 +639,7 @@ export default function ReportsPage() {
             Estadísticas del período y saldo actual de caja
           </span>
         </button>
-        <button onClick={() => exportFinancial("excel")} disabled={!reportReady || cash.loading || !!cash.error || exporting} className="bg-emerald-700 text-white py-4 rounded-xl font-bold disabled:opacity-50">
+        <button onClick={() => exportFinancial("excel")} disabled={!reportReady || exporting} className="bg-emerald-700 text-white py-4 rounded-xl font-bold disabled:opacity-50">
           {exporting ? "Preparando reporte…" : "Reporte financiero (Excel)"}
           <span className="block text-xs font-normal mt-1">Resumen y movimientos detallados de la caja actual</span>
         </button>

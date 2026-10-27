@@ -6,7 +6,7 @@ const React = require("react");
 
 function harness(services = [], cash = { session: null, loading: false, error: "" }, advances = []) {
   let cursor = 0;
-  const states = [], tables = [], documents = [], notices = [];
+  const states = [], tables = [], documents = [], notices = [], cashRequests = [];
   const hooks = {
     ...React,
     useState(initial) {
@@ -28,7 +28,11 @@ function harness(services = [], cash = { session: null, loading: false, error: "
     if (name === "@/lib/reports/fonts") return {normalFont:"",boldFont:""};
     if(name === "@/lib/operations/treasury-model")return require("../.test-build/operations/treasury-model.js");
     if(name === "@/lib/reports/loadTreasury")return {loadTreasuryReport:async()=>undefined};
-    if (name === "@/lib/reports/loadCash") return {loadCashReport: async () => ({session: cash.session, movements: []})};
+    if (name === "@/lib/reports/loadCash") return {loadCashReport: async (range) => {
+      cashRequests.push(range);
+      const balance=cash.session?.balances.Efectivo ?? 0, opening=cash.session?.openingAmount ?? 0;
+      return {session:null,movements:[],periodCash:cash.periodCash ?? {balance,opening,incoming:balance-opening,outgoing:0,net:balance-opening,reconciled:true,sessionCount:cash.session?1:0}};
+    }};
     if (name === "@/lib/reports/excel") return {financialExcel() {}, saveExcel() {}};
     if (name === "@/lib/reports/pdf") {
       const pdfModule = {exports:{}};
@@ -50,6 +54,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
       constructor() { this.texts = []; documents.push(this); }
       addFileToVFS() {} addFont() {} setFontSize() {} setFont() {} setTextColor() {} setDrawColor() {} setFillColor() {} rect() {} roundedRect() {} triangle() {} circle() {} line() {} lines() {}
       text(value) { this.texts.push(value); }
+      addPage() {} getNumberOfPages() { return 2; } setPage() {}
       save(filename) { this.filename = filename; }
     };
     if (name === "jspdf-autotable") return (doc, options) => {
@@ -82,7 +87,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
     const node = nodes(render()).find((n) => n.type === "button" && n.props.disabled !== undefined && n.props.className.includes("ml-2"));
     await node.props.onClick();
   };
-  return { render, nodes, textOf, button, checks, refresh, tables, documents, notices, setFailure: () => { fail = true; } };
+  return { render, nodes, textOf, button, checks, refresh, tables, documents, notices, cashRequests, setFailure: () => { fail = true; } };
 }
 const service = (id, name, commission, extra = {}) => ({
   washerId: id, washerName: name, paymentStatus: "paid",
@@ -137,25 +142,27 @@ test("empty, failed or changed-period reports cannot export stale payroll", asyn
 });
 
 
-test("financial report and PDF follow current cash after a tip payment, independent of period receipts", async () => {
+test("financial report refreshes period cash and remains exportable without a current open cash", async () => {
   const cash = { session: { balances: { Efectivo: 12 }, openingAmount: 0 }, loading: false, error: "" };
   const h = harness([service("a", "Ana", 5, {paymentMethod: "Efectivo"})], cash);
   await h.refresh();
   const cashCard = () => h.nodes(h.render()).find(n => n.type === "h3" && n.props.className === "text-4xl font-black tracking-tight");
   assert.equal(h.textOf(cashCard()), "$12.00");
   cash.session.balances.Efectivo = 7;
+  await h.refresh();
   assert.equal(h.textOf(cashCard()), "$7.00");
   await h.button("Control Financiero Interno").props.onClick();
-  assert.ok(h.documents[0].texts.includes("SALDO TOTAL EN CAJA"));
+  assert.ok(h.documents[0].texts.includes("SALDOS FINALES DEL PERÍODO"));
   assert.ok(h.documents[0].texts.includes("$7.00"));
   assert.ok(h.tables.some(table => table.body.some(row => row.includes("$20.00"))));
   cash.session = null;
-  assert.equal(h.textOf(cashCard()), "Sin caja abierta");
+  await h.refresh();
+  assert.equal(h.textOf(cashCard()), "$0.00");
   cash.error = "No se pudo consultar el saldo de Caja.";
-  assert.equal(h.textOf(cashCard()), "No disponible");
-  assert.equal(h.button("Control Financiero Interno").props.disabled, true);
+  assert.equal(h.textOf(cashCard()), "$0.00");
+  assert.equal(h.button("Control Financiero Interno").props.disabled, false);
   await h.button("Control Financiero Interno").props.onClick();
-  assert.equal(h.documents.length, 1);
+  assert.equal(h.documents.length, 2);
 });
 
 
@@ -173,10 +180,12 @@ test("net cash excludes opening fund and paid tips while period cash sales remai
   assert.ok(h.documents[0].texts.includes("Efectivo a guardar de la jornada"));
   assert.ok(h.documents[0].texts.includes("$7.00"));
   cash.session.balances.Efectivo = 60;
+  await h.refresh();
   assert.match(h.textOf(card()), /\$-5\.00/); // Outflows may use part of the opening fund.
   assert.equal(gross.props.amount, 12);
   cash.session = null;
-  assert.match(h.textOf(card()), /Sin caja abierta/);
+  await h.refresh();
+  assert.match(h.textOf(card()), /\$0\.00/);
 });
 
 
@@ -209,4 +218,19 @@ test("payroll shows individual advance movements under the correct washer and fi
   assert.match(body[1][0].content, /2026-10-27\nAdelanto personal/);
   assert.match(body[2][0].content, /2026-10-28\nAdelanto transporte/);
   assert.ok(!JSON.stringify(body).includes("Otro lavador"));
+});
+
+
+test("historical exports pass identical selected dates to PDF and Excel without consulting current cash state", async()=>{
+ const h=harness([], {session:{balances:{Efectivo:9999},openingAmount:0},loading:true,error:"Current cash unavailable",periodCash:{balance:27,opening:20,net:7,incoming:12,outgoing:5,reconciled:true,sessionCount:1,statusLabel:"Cajas cerradas en el período"}});
+ await h.refresh();
+ const dates=()=>h.nodes(h.render()).filter(n=>n.type==="input" && n.props.type==="date");
+ dates()[0].props.onChange({target:{value:"2026-10-20"}});
+ dates()[1].props.onChange({target:{value:"2026-10-21"}});
+ await h.refresh();
+ await h.button("Control Financiero Interno").props.onClick();
+ assert.deepEqual(h.cashRequests.at(-1),{start:"2026-10-20",end:"2026-10-21"});
+ assert.ok(h.documents[0].texts.includes("$7.00"));
+ assert.ok(!JSON.stringify(h.documents[0].texts).includes("9999"));
+ assert.ok(!h.textOf(h.render()).includes("9999"));
 });

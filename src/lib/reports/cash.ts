@@ -49,6 +49,7 @@ export function cashTotals(session: CashSession, rows: CashMovement[]) {
 import { type CashAdvance } from "../operations/treasury-model";
 import { type TreasuryReport } from "./treasury";
 export interface FinancialReport {
+  periodCash?: PeriodCash;
   advanceRows?: CashAdvance[];
   advancesTotal?: number;
   payrollNet?: number;
@@ -63,4 +64,45 @@ export interface FinancialReport {
   session: CashSession | null;
   movements: DetailedMovement[];
   currentSessionMovements?: DetailedMovement[];
+}
+
+
+export interface PeriodCash {
+  statusLabel?: string;
+  opening: number | null;
+  balance: number | null;
+  incoming: number;
+  outgoing: number;
+  net: number;
+  reconciled: boolean;
+  sessionCount: number;
+}
+export function summarizePeriodCash(rows: DetailedMovement[]): PeriodCash {
+  const groups = new Map<string, DetailedMovement[]>();
+  for (const row of rows) {
+    if (!METHODS.includes(row.method) || !Number.isFinite(row.amount)) throw new Error("Hay movimientos de caja inválidos en el período.");
+    const group = groups.get(row.sessionId) ?? []; group.push(row); groups.set(row.sessionId, group);
+  }
+  let opening = 0, balance = 0, incoming = 0, outgoing = 0, known = true;
+  for (const group of groups.values()) {
+    const first = group[0], last = group[group.length - 1];
+    const initial = group.find(row => row.kind === "opening");
+    const base = initial ? initial.amount : first.balancesBefore?.Efectivo;
+    const final = last.balancesAfter?.Efectivo;
+    if (base == null || final == null) known = false;
+    else { opening = money(opening + base); balance = money(balance + final); }
+    for (const row of group) {
+      if (row.method !== "Efectivo" || row.kind === "opening") continue;
+      if (["expense", "withdrawal", "payroll_advance", "envelope_deposit"].includes(row.kind)) outgoing = money(outgoing - row.amount);
+      else incoming = money(incoming + row.amount);
+    }
+  }
+  const net = money(incoming - outgoing);
+  return { opening: known ? opening : null, balance: known ? balance : null, incoming, outgoing, net,
+    reconciled: known && Math.abs(opening + net - balance) < .005, sessionCount: groups.size };
+}
+export function reportCashView(report: FinancialReport) {
+  if (report.periodCash) return report.periodCash;
+  return report.session ? { ...cashTotals(report.session, report.currentSessionMovements ?? report.movements), opening: report.session.openingAmount, balance: report.session.balances.Efectivo, sessionCount: 1 } :
+    { opening: 0, balance: 0, incoming: 0, outgoing: 0, net: 0, reconciled: true, sessionCount: 0 };
 }

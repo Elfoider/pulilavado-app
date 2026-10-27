@@ -68,3 +68,11 @@ La nómina en pantalla y el PDF muestran debajo de cada lavador sus vales del pe
 ## Excel por rango de fechas (1.4.2)
 
 La hoja Movimientos incluye todos los movimientos del rango seleccionado en horario de Caracas, de cajas abiertas y cerradas. Incluye ID de caja y los saldos propios de cada sesión, sin acumular saldos entre aperturas. Los saldos históricos solo se reconstruyen con el registro completo y conciliado de esa caja. El resumen conserva la conciliación de la caja actual, independiente del rango.
+
+## Reportes históricos de caja (1.4.3)
+
+PDF y Excel usan el rango completo seleccionado. No leen ni requieren la caja abierta actualmente. Las tarjetas de Reportes también usan ese período; Actualizar vuelve a consultar sus movimientos. El PDF incorpora detalle de movimientos con fecha, caja, motivo, método, monto y saldo antes/después.
+
+El efectivo a guardar es el flujo neto de efectivo del rango, sin aperturas y después de gastos, retiros, vales y guardados en sobres. Si ya se trasladó todo al sobre, el efectivo pendiente de guardar es cero. Para varios días se acumulan los flujos de sus cajas. Los fondos y saldos finales se muestran como **acumulados por caja**, no como el dinero físico disponible simultáneamente. Si el registro histórico no permite reconstruir saldos, se marca No disponible sin inventarlos.
+
+No se reemplazan montos por Caja cerrada. El estado se muestra en texto pequeño aparte, según las cajas con movimientos del rango y sus fechas de cierre. Un rango sin movimientos muestra cero; no implica que se hayan recuperado registros anteriores que nunca se guardaron en el historial. Para un día específico, establezca la misma fecha en ambos campos. El complemento de sobres semanales se incluye solo con el filtro Semana; las fechas personalizadas muestran exclusivamente el período seleccionado.

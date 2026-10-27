@@ -1,27 +1,28 @@
 import * as XLSX from "xlsx";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { METHODS } from "../operations/model";
-import { cashTotals, FinancialReport, movementKinds } from "./cash";
+import { reportCashView, FinancialReport, movementKinds } from "./cash";
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export function financialExcel(report: FinancialReport): Uint8Array {
   const wb = XLSX.utils.book_new();
-  const cash = report.session ? cashTotals(report.session, report.currentSessionMovements ?? report.movements) : null;
+  const cash = reportCashView(report);
+  const periodMode = !!report.periodCash;
   const rows: (string | number | null)[][] = Array.from({ length: 39 }, () => []);
   const put = (r: number, c: number, v: string | number | null) => { rows[r - 1][c - 1] = v; };
   put(1, 1, "MR. ESPUMA / PULILAVADO"); put(2, 1, "Reporte financiero"); put(3, 1, report.period); put(3, 10, report.generatedAt);
-  put(5, 1, "EFECTIVO A GUARDAR DE LA JORNADA"); put(6, 1, cash?.net ?? "Sin caja abierta");
-  put(9, 1, "Saldo total en caja (incluye fondo)"); put(9, 6, report.session?.balances.Efectivo ?? "Sin caja abierta");
+  put(5, 1, "EFECTIVO A GUARDAR DE LA JORNADA"); put(6, 1, cash.net);
+  put(9, 1, periodMode ? "Saldos finales acumulados del período" : "Saldo total en caja (incluye fondo)"); put(9, 6, cash.balance ?? "No disponible");
   put(10, 1, "Ventas de servicios y productos"); put(10, 6, report.sales);
   rows[11] = ["Método", "Ventas", null, "Propinas", null, null, null, "Total"];
   METHODS.forEach((m, i) => { put(13 + i, 1, m); put(13 + i, 2, report.income[m]); put(13 + i, 4, report.tips[m]); put(13 + i, 8, report.income[m] + report.tips[m]); });
   put(17, 1, "TOTAL"); put(17, 2, report.sales); put(17, 4, METHODS.reduce((s, m) => s + report.tips[m], 0)); put(17, 8, report.sales + METHODS.reduce((s, m) => s + report.tips[m], 0));
-  put(19, 1, "Conciliación del efectivo de la caja actual");
-  [["Fondo inicial", report.session?.openingAmount], ["Entradas netas en efectivo", cash?.reconciled ? cash.incoming : undefined], ["Pagos y gastos en efectivo", cash?.reconciled ? cash.outgoing : undefined], ["Saldo total en caja", report.session?.balances.Efectivo], ["Efectivo a guardar de la jornada", cash?.net]].forEach(([label, value], i) => { put(20 + i, 1, label as string); put(20 + i, 6, value ?? "No disponible"); });
+  put(19, 1, periodMode ? "Conciliación del efectivo del período" : "Conciliación del efectivo de la caja consultada");
+  [[periodMode ? "Fondos iniciales acumulados" : "Fondo inicial", cash.opening], ["Entradas netas en efectivo", cash?.reconciled ? cash.incoming : undefined], ["Pagos y gastos en efectivo", cash?.reconciled ? cash.outgoing : undefined], [periodMode ? "Saldos finales acumulados" : "Saldo total en caja", cash.balance], ["Efectivo a guardar de la jornada", cash?.net]].forEach(([label, value], i) => { put(20 + i, 1, label as string); put(20 + i, 6, value ?? "No disponible"); });
   put(26, 1, "Comisiones y propinas");
   [["Comisiones generadas", report.payroll], ["Ventas menos comisiones", report.business], ["Propinas recibidas", METHODS.reduce((s, m) => s + report.tips[m], 0)], ["Salidas de efectivo", cash?.reconciled ? cash.outgoing : "No disponible"]].forEach(([label, value], i) => { put(27 + i, 1, label); put(27 + i, 6, value); });
-  put(32, 1, "Ingresos del negocio antes de costos y gastos."); put(33, 1, "Caja actual independiente del filtro de ventas.");
+  put(32, 1, "Ingresos del negocio antes de costos y gastos."); put(33, 1, periodMode ? "Fondos y saldos acumulados por caja; no son efectivo físico conjunto." : "Datos de la caja consultada.");
   if (report.advancesTotal !== undefined) {put(34,1,"Vales descontados del período");put(34,6,report.advancesTotal);put(37,1,"Nómina neta del período");put(37,6,report.payrollNet??report.payroll);}
-  put(35, 1, `Caja: ${report.session?.id ?? "Sin caja abierta"}`); put(36, 1, "Arqueo físico: pendiente");
+  put(35, 1, periodMode ? `Cajas con movimientos en el período: ${cash.sessionCount}` : `Caja: ${report.session?.id ?? "Sin apertura registrada"}`); put(36, 1, periodMode ? report.periodCash?.statusLabel ?? "Saldos al último movimiento de cada caja dentro del rango." : report.session?.status === "open" ? "Estado: caja abierta" : "Estado: caja cerrada / sin apertura");
   put(35, 10, "Guardar"); put(35, 11, cash?.net ?? null); put(36, 10, "Salidas"); put(36, 11, cash?.outgoing ?? null);
   put(38, 1, "Preparado por: __________________"); put(38, 10, "Revisado por: __________________");
   const summary = XLSX.utils.aoa_to_sheet(rows);
