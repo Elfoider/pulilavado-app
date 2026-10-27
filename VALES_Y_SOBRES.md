@@ -60,3 +60,7 @@ Instale y despliegue la versión 1.4.0 del repositorio. No se alteran los regist
 Las nuevas colecciones son `cashAdvances`, `cashEnvelopes`, `envelopeMovements` y `treasuryControl`. Usan los mismos permisos operativos del proyecto; si las reglas existentes restringen el acceso por nombre de colección, el administrador de Firebase deberá habilitar esas operaciones para las cuentas autorizadas.
 
 Las pruebas usan únicamente un proyecto `demo-` con Firestore emulado. No se realizaron escrituras en los datos de producción.
+
+## Detalle de vales en nómina (1.4.1)
+
+La nómina en pantalla y el PDF muestran debajo de cada lavador sus vales del período, con fecha, motivo y monto individual, en orden cronológico. El vínculo usa el ID del lavador, incluso si dos personas comparten nombre. El PDF incluye únicamente los lavadores seleccionados y sus movimientos. Estos renglones detallan la deducción total y no la descuentan por segunda vez. Para registrar un vale, Caja → Vale / adelanto a lavador → seleccionar lavador, monto y motivo.

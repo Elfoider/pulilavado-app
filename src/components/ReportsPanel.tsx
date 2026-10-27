@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef } from "react";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -21,7 +21,7 @@ import {
 // --- IMPORTAR LIBRERÍAS DE PDF ---
 import jsPDF from "jspdf";
 import { normalFont, boldFont } from "@/lib/reports/fonts";
-import autoTable from "jspdf-autotable";
+import autoTable, { type RowInput } from "jspdf-autotable";
 import { enqueueSnackbar } from "notistack";
 import { formatMoney } from "@/lib/utils";
 import { useCurrentCash } from "@/lib/useCurrentCash";
@@ -267,7 +267,7 @@ export default function ReportsPage() {
     );
 
     // Tabla
-    const tableData = selectedPayroll.map((item) => [
+    const tableData: RowInput[] = selectedPayroll.flatMap((item) => [[
       item.washerName,
       item.count,
       `${formatMoney(item.totalPay)}`,
@@ -275,7 +275,12 @@ export default function ReportsPage() {
       `${formatMoney(item.netPay)}`,
       `${formatMoney(item.excess)}`,
       "",
-    ]);
+    ], ...advanceRows.filter(advance => advance.washerId === item.washerId)
+      .sort((a, b) => a.day.localeCompare(b.day) || (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0))
+      .map(advance => [
+        { content: `Vale · ${advance.day}\n${advance.description || "Sin motivo registrado"}`, colSpan: 3, styles: { fillColor: [245, 248, 250] as [number, number, number], fontSize: 8 } },
+        { content: `-${formatMoney(advance.amount)}`, colSpan: 4, styles: { fillColor: [245, 248, 250] as [number, number, number], fontSize: 8 } },
+      ])]);
 
     autoTable(doc, {
       startY: 40,
@@ -584,10 +589,20 @@ export default function ReportsPage() {
             <table className="w-full text-sm">
               <thead><tr className="border-b text-left"><th className="p-3">Incluir</th><th className="p-3">Lavador</th><th className="p-3 text-right">Autos lavados</th><th className="p-3 text-right">Comisiones</th><th className="p-3 text-right">Vales</th><th className="p-3 text-right">A pagar</th><th className="p-3 text-right">Excedente de vales</th></tr></thead>
               <tbody>{payrollList.map((item) => (
-                <tr key={item.washerId} className="border-b">
+                <Fragment key={item.washerId}><tr className="border-b">
                   <td className="p-3"><input type="checkbox" aria-label={`Incluir a ${item.washerName} en la nómina (${item.washerId})`} checked={!excludedWasherIds.includes(item.washerId)} onChange={(e) => setExcludedWasherIds((previous) => e.target.checked ? previous.filter((id) => id !== item.washerId) : [...previous, item.washerId])} className="h-5 w-5 accent-cyan-700" /></td>
                   <td className="p-3 font-medium">{item.washerName}</td><td className="p-3 text-right">{item.count}</td><td className="p-3 text-right whitespace-nowrap">{formatMoney(item.totalPay)}</td><td className="p-3 text-right">{formatMoney(item.advances)}</td><td className="p-3 text-right font-bold">{formatMoney(item.netPay)}</td><td className="p-3 text-right">{formatMoney(item.excess)}</td>
                 </tr>
+                {advanceRows.filter(advance => advance.washerId === item.washerId)
+                  .sort((a, b) => a.day.localeCompare(b.day) || (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0))
+                  .map((advance) => <tr key={advance.id} className="bg-slate-50 border-b text-xs text-slate-600" aria-label={`Vale de ${item.washerName}`}>
+                    <td />
+                    <td className="p-3">Vale · {advance.day}</td>
+                    <td colSpan={2} className="p-3 whitespace-pre-wrap">{advance.description || "Sin motivo registrado"}</td>
+                    <td className="p-3 text-right whitespace-nowrap">-{formatMoney(advance.amount)}</td>
+                    <td colSpan={2} />
+                  </tr>)}
+                </Fragment>
               ))}</tbody>
             </table>
           </div>

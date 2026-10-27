@@ -43,7 +43,7 @@ function harness(services = [], cash = { session: null, loading: false, error: "
       Timestamp: { fromDate: (date) => date },
       async getDocs(path) {
         if (fail) throw new Error("Test read error");
-        return { forEach: (fn) => (path === "services" ? services : path === "cashAdvances" ? advances : []).forEach((s) => fn({ data: () => s })) };
+        return { forEach: (fn) => (path === "services" ? services : path === "cashAdvances" ? advances : []).forEach((s) => fn({ id: s.id, data: () => s })) };
       },
     };
     if (name === "jspdf") return class PDF {
@@ -187,4 +187,26 @@ test("payroll deducts identified washer advances and includes advances-only wash
  assert.deepEqual(body.find(r=>r[2]==="$50.00"),["Ana",1,"$50.00","$20.00","$30.00","$0.00",""]);
  assert.deepEqual(body.find(r=>r[0]==="Luis"),["Luis",0,"$0.00","$10.00","$0.00","$10.00",""]);
  assert.ok(h.documents[0].texts.includes("TOTAL NÓMINA A DISPERSAR: $60.00"));
+});
+
+
+test("payroll shows individual advance movements under the correct washer and filters their PDF details", async () => {
+  const h = harness([service("a", "Ana", 50), service("b", "Ana", 30)], undefined, [
+    {id:"v1", washerId:"a", washerName:"Ana", amount:8, day:"2026-10-28", description:"Adelanto transporte"},
+    {id:"v2", washerId:"a", washerName:"Ana", amount:12, day:"2026-10-27", description:"Adelanto personal"},
+    {id:"v3", washerId:"b", washerName:"Ana", amount:5, day:"2026-10-27", description:"Otro lavador"},
+  ]);
+  await h.refresh();
+  const detailRows = h.nodes(h.render()).filter(n => n.type === "tr" && n.props["aria-label"] === "Vale de Ana");
+  assert.equal(detailRows.length, 3);
+  assert.match(h.textOf(detailRows[0]), /2026-10-27.*Adelanto personal.*12\.00/);
+  assert.match(h.textOf(detailRows[1]), /2026-10-28.*Adelanto transporte.*8\.00/);
+  h.checks().find(n => n.props["aria-label"].includes("(b)")).props.onChange({target:{checked:false}});
+  h.button("Reporte de Pago de Nómina").props.onClick();
+  const body = h.tables[0].body;
+  assert.equal(body.length, 3);
+  assert.equal(body[0][4], "$30.00");
+  assert.match(body[1][0].content, /2026-10-27\nAdelanto personal/);
+  assert.match(body[2][0].content, /2026-10-28\nAdelanto transporte/);
+  assert.ok(!JSON.stringify(body).includes("Otro lavador"));
 });

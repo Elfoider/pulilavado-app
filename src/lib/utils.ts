@@ -43,6 +43,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.4.0 - Vales y sobres";
+export const versionSoft = "v1.4.1 - Vales y sobres";
 
 
