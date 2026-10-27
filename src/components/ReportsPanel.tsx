@@ -479,6 +479,8 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <Link href="/movements" className="inline-block text-cyan-800 underline">Consultar movimientos de caja por fechas</Link>
+
       {/* DESGLOSES */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">

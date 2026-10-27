@@ -47,15 +47,15 @@ test('historical Excel movements are available without any open cash and a singl
  await assert.rejects(setup({active:false,fail:true})({start:'2026-10-27',end:'2026-10-28'}),/Permission denied/);
 });
 
-test('PDF uses only period cash, prints all historical movements, and never replaces cash amount with closed status', async()=>{
+test('PDF uses only period cash, omits detailed movements, and never replaces cash amount with closed status', async()=>{
  const snapshot=await setup()({start:'2026-10-27',end:'2026-10-27'});
  assert.equal(snapshot.periodCash.statusLabel,'Cajas cerradas en el período');
  const {jsPDF}=require('jspdf');const {financialPDF}=require('../.test-build/reports/pdf.js');
  const doc=new jsPDF(),texts=[];const draw=doc.text.bind(doc);doc.text=(...args)=>{texts.push(args[0]);return draw(...args)};
  const data={...snapshot,period:'2026-10-27',generatedAt:'test',sales:30,business:15,payroll:15,income:balances(30),tips:balances(0)};
  const pdf=financialPDF(data,doc);const content=JSON.stringify(texts);
- assert.equal(pdf.getNumberOfPages(),2);
- assert.ok(content.includes('$20.00'));assert.ok(content.includes('tuesday-sale'));assert.ok(content.includes('tuesday-expense'));
+ assert.equal(pdf.getNumberOfPages(),1);
+ assert.ok(content.includes('$20.00'));assert.ok(!content.includes('tuesday-sale'));assert.ok(!content.includes('tuesday-expense'));
  assert.ok(!content.includes('wednesday-sale'));assert.ok(!content.includes('Caja abierta'));assert.ok(!content.includes('Sin caja abierta'));
  const empty=await setup()({start:'2026-10-01',end:'2026-10-01'});
  assert.equal(empty.periodCash.net,0);assert.equal(empty.periodCash.balance,0);assert.equal(empty.periodCash.statusLabel,'Sin movimientos de caja');

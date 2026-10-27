@@ -76,3 +76,9 @@ PDF y Excel usan el rango completo seleccionado. No leen ni requieren la caja ab
 El efectivo a guardar es el flujo neto de efectivo del rango, sin aperturas y después de gastos, retiros, vales y guardados en sobres. Si ya se trasladó todo al sobre, el efectivo pendiente de guardar es cero. Para varios días se acumulan los flujos de sus cajas. Los fondos y saldos finales se muestran como **acumulados por caja**, no como el dinero físico disponible simultáneamente. Si el registro histórico no permite reconstruir saldos, se marca No disponible sin inventarlos.
 
 No se reemplazan montos por Caja cerrada. El estado se muestra en texto pequeño aparte, según las cajas con movimientos del rango y sus fechas de cierre. Un rango sin movimientos muestra cero; no implica que se hayan recuperado registros anteriores que nunca se guardaron en el historial. Para un día específico, establezca la misma fecha en ambos campos. El complemento de sobres semanales se incluye solo con el filtro Semana; las fechas personalizadas muestran exclusivamente el período seleccionado.
+
+## Consulta de movimientos (1.4.4)
+
+El menú Movimientos abre una consulta de Caja por fecha inicial y final, con accesos Hoy y Esta semana (martes a lunes). Incluye cajas abiertas y cerradas sin requerir una apertura actual. Muestra fecha y hora de Caracas, tipo, motivo, lavador cuando corresponde, método, monto y saldos antes/después. Ver detalle amplía caja, referencia, ID de movimiento, origen de los saldos y saldos de todos los métodos. Los resultados se recorren en páginas de 50 filas, sin recortar el total del rango. Consultar movimientos también actualiza los datos.
+
+El PDF conserva el resumen financiero, gráficas y resumen semanal cuando corresponde, sin tablas de movimientos individuales de Caja ni de sobres. El Excel conserva ambos detalles.

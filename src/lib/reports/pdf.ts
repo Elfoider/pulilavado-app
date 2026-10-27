@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import { normalFont, boldFont } from "./fonts";
 import autoTable from "jspdf-autotable";
 import { METHODS } from "../operations/model";
-import { reportCashView, FinancialReport, movementKinds } from "./cash";
+import { reportCashView, FinancialReport } from "./cash";
 const dollars = (n: number) => `$${n.toFixed(2)}`;
 export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   doc.addFileToVFS("ReportSans.ttf", normalFont); doc.addFont("ReportSans.ttf", "ReportSans", "normal");
@@ -94,7 +94,7 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   text(198, 269, periodMode ? "Saldos al último movimiento del rango" : "Datos de la caja consultada", 7, muted, false, true);
   doc.setDrawColor("#D9E4E9"); doc.line(12, 280, 96, 280); doc.line(114, 280, 198, 280);
   text(12, 285, "Preparado por", 8, muted); text(114, 285, "Revisado por", 8, muted);
-  text(12, 293, periodMode ? "Fondos y saldos acumulados por caja; no equivalen a efectivo físico conjunto." : `Caja: ${report.session?.id ?? "Sin apertura registrada"}`, 6, muted); if (!report.weekly && !periodMode) text(198, 293, "1 / 1", 7, muted, false, true);
+  text(12, 293, periodMode ? "Fondos y saldos acumulados por caja; no equivalen a efectivo físico conjunto." : `Caja: ${report.session?.id ?? "Sin apertura registrada"}`, 6, muted); if (!report.weekly) text(198, 293, "1 / 1", 7, muted, false, true);
   if (report.weekly) {
     const week=report.weekly;
     doc.addPage();
@@ -112,30 +112,11 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
       ["Vales del período para descuento de nómina",dollars(report.advancesTotal??0)],
       ["Nómina neta del período después de vales",dollars(report.payrollNet??report.payroll)],
     ],styles:{font:"ReportSans",fontSize:9,cellPadding:2.5},headStyles:{fillColor:navy},columnStyles:{1:{halign:"right"}}});
-    let y=(doc as jsPDF & {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+9;
+    const y=(doc as jsPDF & {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+9;
     text(12,y,"Sobres de cada día (saldo actual)",12,navy,true);
     autoTable(doc,{startY:y+4,margin:{left:12,right:12},head:[["Sobre del día","Recibido + inicial","Gastos","A Caja","Disponible"]],body:week.envelopes.length?week.envelopes.map(e=>[e.day,dollars(e.deposited+(e.initialAmount??0)),dollars(e.spent),dollars(e.toCash),dollars(e.balance)]):[["Sin sobres registrados","-","-","-","-"]],styles:{font:"ReportSans",fontSize:8,cellPadding:2.5},headStyles:{fillColor:green}});
-    y=(doc as jsPDF & {lastAutoTable:{finalY:number}}).lastAutoTable.finalY+10;
-    if(y>238){doc.addPage();y=20;}
-    text(12,y,"Retiros y depósitos de sobres realizados en la semana",11,navy,true);
-    autoTable(doc,{startY:y+4,margin:{left:12,right:12,bottom:18},head:[["Fecha","Sobre","Destino / origen","Monto","Antes","Después","Motivo"]],body:week.envelopeMovements.length?week.envelopeMovements.map(m=>[m.day,m.envelopeDay,m.kind==="opening"?"Inicial declarado":m.kind==="deposit"?"De Caja":m.kind==="to_cash"?"A Caja":"Gasto directo",dollars(m.amount),dollars(m.balanceBefore),dollars(m.balanceAfter),m.description]):[["Sin movimientos","","","","","",""]],styles:{font:"ReportSans",fontSize:7,cellPadding:2},headStyles:{fillColor:navy},columnStyles:{6:{cellWidth:48}}});
   }
-  if (periodMode) {
-    doc.addPage();
-    text(12, 18, "Movimientos de caja del período", 18, navy, true);
-    text(12, 27, report.period, 9, muted);
-    autoTable(doc, { startY: 34, margin: { left: 12, right: 12, bottom: 20 },
-      head: [["Fecha / Caja", "Movimiento / motivo", "Método", "Monto", "Antes", "Después"]],
-      body: report.movements.length ? report.movements.map(m => [
-        `${m.createdAt ? new Date(m.createdAt.seconds * 1000).toLocaleString("es-VE", {timeZone:"America/Caracas"}) : "Sin fecha"}\n${m.sessionId}`,
-        `${movementKinds[m.kind] ?? m.kind}\n${m.description}\nSaldos: ${m.balanceSource}`,
-        m.method, dollars(m.amount), m.balancesBefore ? dollars(m.balancesBefore[m.method]) : "No disponible", m.balancesAfter ? dollars(m.balancesAfter[m.method]) : "No disponible",
-      ]) : [["Sin movimientos en el período", "", "", "", "", ""]],
-      styles: {font:"ReportSans",fontSize:7,cellPadding:2}, headStyles:{fillColor:navy},
-      columnStyles:{0:{cellWidth:42},1:{cellWidth:60}}, rowPageBreak:"avoid",
-    });
-  }
-  if (report.weekly || periodMode) {
+  if (report.weekly) {
     const pages=doc.getNumberOfPages();
     for(let page=1;page<=pages;page++){doc.setPage(page);text(198,293,`${page} / ${pages}`,7,muted,false,true);}
   }
