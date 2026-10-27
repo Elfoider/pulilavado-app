@@ -5,7 +5,7 @@ import { cashTotals, FinancialReport, movementKinds } from "./cash";
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export function financialExcel(report: FinancialReport): Uint8Array {
   const wb = XLSX.utils.book_new();
-  const cash = report.session ? cashTotals(report.session, report.movements) : null;
+  const cash = report.session ? cashTotals(report.session, report.currentSessionMovements ?? report.movements) : null;
   const rows: (string | number | null)[][] = Array.from({ length: 39 }, () => []);
   const put = (r: number, c: number, v: string | number | null) => { rows[r - 1][c - 1] = v; };
   put(1, 1, "MR. ESPUMA / PULILAVADO"); put(2, 1, "Reporte financiero"); put(3, 1, report.period); put(3, 10, report.generatedAt);
@@ -32,11 +32,11 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   for (const r of [20,21,22,27,28,29,30]) summary["!merges"]!.push(XLSX.utils.decode_range(`F${r}:H${r}`));
   if(report.advancesTotal!==undefined) for(const range of ["A34:E34","F34:H34","A37:E37","F37:H37"]) summary["!merges"]!.push(XLSX.utils.decode_range(range));
   for (const addr of Object.keys(summary)) { if (addr.startsWith("!")) continue; if (summary[addr].t === "n") summary[addr].z = '"$"#,##0.00;[Red]("$"#,##0.00)'; }
-  const details = [["Fecha", "Orden", "Tipo", "Método", "Monto", "Saldo método antes", "Saldo método después", "Efectivo antes", "Efectivo después", "Yappy antes", "Yappy después", "Tarjeta antes", "Tarjeta después", "ACH antes", "ACH después", "Detalle", "Referencia", "ID movimiento", "Saldos"],
-    ...report.movements.map(m => [m.createdAt ? (m.createdAt.seconds - 4 * 3600) / 86400 + 25569 : null, m.sequence ?? null, movementKinds[m.kind] ?? m.kind, m.method, m.amount, m.balancesBefore?.[m.method] ?? null, m.balancesAfter?.[m.method] ?? null, ...METHODS.flatMap(method => [m.balancesBefore?.[method] ?? null, m.balancesAfter?.[method] ?? null]), m.description, m.referenceId, m.id, m.balanceSource])];
+  const details = [["Fecha", "Orden", "Tipo", "Método", "Monto", "Saldo método antes", "Saldo método después", "Efectivo antes", "Efectivo después", "Yappy antes", "Yappy después", "Tarjeta antes", "Tarjeta después", "ACH antes", "ACH después", "Detalle", "Referencia", "ID movimiento", "Saldos", "ID de caja"],
+    ...report.movements.map(m => [m.createdAt ? (m.createdAt.seconds - 4 * 3600) / 86400 + 25569 : null, m.sequence ?? null, movementKinds[m.kind] ?? m.kind, m.method, m.amount, m.balancesBefore?.[m.method] ?? null, m.balancesAfter?.[m.method] ?? null, ...METHODS.flatMap(method => [m.balancesBefore?.[method] ?? null, m.balancesAfter?.[method] ?? null]), m.description, m.referenceId, m.id, m.balanceSource, m.sessionId])];
   const movements = XLSX.utils.aoa_to_sheet(details);
   movements["!cols"] = details[0].map((_, i) => ({ wch: i === 0 ? 22 : i >= 15 ? 32 : i === 2 ? 23 : 19 }));
-  movements["!autofilter"] = { ref: `A1:S${details.length}` };
+  movements["!autofilter"] = { ref: `A1:T${details.length}` };
   for (let r = 2; r <= details.length; r++) { if (movements[`A${r}`]) movements[`A${r}`].z = "dd/mm/yyyy hh:mm:ss"; for (let col = 4; col <= 14; col++) { const cell = movements[`${XLSX.utils.encode_col(col)}${r}`]; if (cell?.t === "n") cell.z = '"$"#,##0.00;[Red]("$"#,##0.00)'; } }
   XLSX.utils.book_append_sheet(wb, summary, "Resumen"); XLSX.utils.book_append_sheet(wb, movements, "Movimientos");
   if (report.advanceRows) {

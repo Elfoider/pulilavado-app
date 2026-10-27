@@ -33,7 +33,7 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
     doc.setFillColor(bg); doc.circle(x, y, radius * .65, "F");
     doc.setFont("ReportSans", "bold"); doc.setFontSize(9); doc.setTextColor(fg); doc.text(center, x, y + 1, { align: "center" });
   };
-  const cash = report.session ? cashTotals(report.session, report.movements) : null;
+  const cash = report.session ? cashTotals(report.session, report.currentSessionMovements ?? report.movements) : null;
   const cashLabel = report.session ? dollars(report.session.balances.Efectivo) : "Sin caja abierta";
   const netLabel = cash ? dollars(cash.net) : "Sin caja abierta";
   box(0, 0, 210, 3, cyan);

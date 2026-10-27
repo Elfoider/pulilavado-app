@@ -323,7 +323,7 @@ export default function ReportsPage() {
     setExporting(true);
     const request = reportRequest.current;
     try {
-      const snapshot = await loadCashReport();
+      const snapshot = await loadCashReport(format === "excel" ? { start: displayedStart, end: displayedEnd } : undefined);
       if (request !== reportRequest.current) throw new Error("El período cambió. Exporte el reporte actualizado.");
       const report: FinancialReport = {
         ...snapshot,

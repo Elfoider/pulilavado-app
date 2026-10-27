@@ -64,3 +64,7 @@ Las pruebas usan únicamente un proyecto `demo-` con Firestore emulado. No se re
 ## Detalle de vales en nómina (1.4.1)
 
 La nómina en pantalla y el PDF muestran debajo de cada lavador sus vales del período, con fecha, motivo y monto individual, en orden cronológico. El vínculo usa el ID del lavador, incluso si dos personas comparten nombre. El PDF incluye únicamente los lavadores seleccionados y sus movimientos. Estos renglones detallan la deducción total y no la descuentan por segunda vez. Para registrar un vale, Caja → Vale / adelanto a lavador → seleccionar lavador, monto y motivo.
+
+## Excel por rango de fechas (1.4.2)
+
+La hoja Movimientos incluye todos los movimientos del rango seleccionado en horario de Caracas, de cajas abiertas y cerradas. Incluye ID de caja y los saldos propios de cada sesión, sin acumular saldos entre aperturas. Los saldos históricos solo se reconstruyen con el registro completo y conciliado de esa caja. El resumen conserva la conciliación de la caja actual, independiente del rango.
