@@ -220,7 +220,6 @@ export default function DashboardPage() {
       </div>
 
       {fetchError && <p role="alert" className="text-red-700">{fetchError}</p>}
-      <ActivitySummary activity={activity} ready={!loading && !fetchError}/>
       <div className="flex flex-wrap items-center gap-2"><HelpTip label="Ventas y saldo de caja">Las ventas incluyen servicios y productos. Los cobros pendientes se muestran cuando se registran sus pagos.</HelpTip><SectionLink href="/cash">Caja</SectionLink></div>
       {/* EQUIPO */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
@@ -258,6 +257,8 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      <ActivitySummary activity={activity} ready={!loading && !fetchError}/>
 
       {/* BITÁCORA / TABLA */}
       <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-sm border border-white/20 overflow-hidden">
