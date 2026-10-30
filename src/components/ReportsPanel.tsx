@@ -100,7 +100,7 @@ export default function ReportsPage() {
   const reportKey = `${filterType}|${displayedStart}|${displayedEnd}`;
   const reportReady = !loading && !reportError && loadedReportKey === reportKey;
   const cashLabel = !reportReady ? "—" : periodCash?.balance == null ? "No disponible" : formatMoney(periodCash.balance);
-  const netCashLabel = !reportReady ? "—" : formatMoney(periodCash?.net ?? 0);
+  const netCashLabel = !reportReady ? "—" : formatMoney(periodCash?.generated ?? periodCash?.net ?? 0);
   const selectedPayroll = payrollList.filter(
     (item) => !excludedWasherIds.includes(item.washerId),
   );
@@ -450,6 +450,8 @@ export default function ReportsPage() {
           {reportReady && <p className="text-xs text-gray-500 mt-2">{periodCash?.statusLabel ?? `${periodCash?.sessionCount ?? 0} caja(s) con movimientos en el período`}</p>}
         </div>
 
+        <div className="p-6 rounded-2xl bg-cyan-50 border border-cyan-100" aria-label="Guardado en sobres"><p className="text-cyan-800 text-xs font-bold uppercase mb-2">Guardado en sobres</p><p className="text-3xl font-black text-cyan-950">{reportReady ? formatMoney(periodCash?.saved ?? cashBreakdown.savedToEnvelopes) : "—"}</p><HelpTip label="Traslados a sobres">Total trasladado desde Caja a sobres dentro del período. No es un gasto ni reduce el efectivo generado por la jornada.</HelpTip></div>
+        <div className="p-6 rounded-2xl bg-white border border-slate-200" aria-label="Pendiente por guardar"><p className="text-slate-500 text-xs font-bold uppercase mb-2">Pendiente por guardar</p><p className="text-3xl font-black text-slate-900">{reportReady ? formatMoney(periodCash?.pending ?? Math.max(0,periodCash?.net ?? 0)) : "—"}</p><HelpTip label="Efectivo pendiente">Exceso de efectivo que queda en las cajas sobre sus fondos dentro del rango. Puede incluir refuerzos desde sobres o fondos adicionales; no es una ganancia nueva.</HelpTip></div>
         <div className="p-6 rounded-2xl bg-white border border-gray-200 shadow-sm">
           <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">
             Ventas de servicios y productos

@@ -1,7 +1,7 @@
 import { CashMovement, CashSession, METHODS, emptyBalances, money } from "../operations/model";
 
 export const movementKinds: Record<string, string> = {
-  payroll_advance: "Vale a lavador", envelope_deposit: "Guardado en sobre", envelope_to_cash: "Refuerzo desde sobre",
+  payroll_advance: "Vale a lavador", envelope_deposit: "Traslado a sobre", envelope_to_cash: "Refuerzo desde sobre",
   opening: "Apertura", expense: "Gasto", withdrawal: "Retiro / pago", income: "Ingreso adicional",
   sale: "Venta", sale_refund: "Anulación venta", service_payment: "Cobro servicio",
   service_payment_tip: "Propina recibida", service_correction: "Reversión cobro",
@@ -68,6 +68,10 @@ export interface FinancialReport {
 
 
 export interface PeriodCash {
+  generated?: number;
+  saved?: number;
+  pending?: number;
+  operatingOutgoing?: number;
   statusLabel?: string;
   opening: number | null;
   balance: number | null;
@@ -98,13 +102,25 @@ export function summarizePeriodCash(rows: DetailedMovement[]): PeriodCash {
     }
   }
   const net = money(incoming - outgoing);
-  return { opening: known ? opening : null, balance: known ? balance : null, incoming, outgoing, net,
+  return { opening: known ? opening : null, balance: known ? balance : null, incoming, outgoing, net, ...cashSavings(rows, net, outgoing),
     reconciled: known && Math.abs(opening + net - balance) < .005, sessionCount: groups.size };
 }
+export function cashSavings(rows: CashMovement[], net: number, outgoing: number) {
+  let saved=0,refills=0,funding=0;
+  for(const row of rows){
+    if(row.method!=="Efectivo")continue;
+    if(!Number.isFinite(row.amount))throw new Error("Movimiento de efectivo inválido.");
+    if(row.kind==="envelope_deposit")saved=money(saved-row.amount);
+    if(row.kind==="envelope_to_cash")refills=money(refills+row.amount);
+    if(row.kind==="income")funding=money(funding+row.amount);
+  }
+  return {generated:money(net+saved-refills-funding),saved,pending:Math.max(0,net),operatingOutgoing:money(outgoing-saved)};
+}
 export function reportCashView(report: FinancialReport) {
-  if (report.periodCash) return report.periodCash;
-  return report.session ? { ...cashTotals(report.session, report.currentSessionMovements ?? report.movements), opening: report.session.openingAmount, balance: report.session.balances.Efectivo, sessionCount: 1 } :
-    { opening: 0, balance: 0, incoming: 0, outgoing: 0, net: 0, reconciled: true, sessionCount: 0 };
+  const rows=report.currentSessionMovements ?? report.movements;
+  const cash=report.periodCash ?? (report.session ? { ...cashTotals(report.session, rows), opening: report.session.openingAmount, balance: report.session.balances.Efectivo, sessionCount: 1 } :
+    { opening: 0, balance: 0, incoming: 0, outgoing: 0, net: 0, reconciled: true, sessionCount: 0 });
+  return {...cash,...cashSavings(rows,cash.net,cash.outgoing)};
 }
 
 

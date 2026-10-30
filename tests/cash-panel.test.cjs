@@ -25,6 +25,7 @@ function renderCash(data) {
     if (name === "@/lib/operations")
       return { newId: () => "test-id", operations: {} };
     if (name === "@/lib/reports/cash") return require("../.test-build/reports/cash.js");
+    if (name === "@/lib/utils") return {formatMoney:n=>`$${n.toFixed(2)}`};
     if (name === "@/lib/firebase") return { db: {} };
     if (name === "notistack") return { enqueueSnackbar() {} };
     if (name === "next/link")

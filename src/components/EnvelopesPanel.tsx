@@ -257,7 +257,7 @@ export default function EnvelopesPanel() {
           conservando el fondo inicial.
         </HelpTip>
         <p>
-          Efectivo a guardar disponible:{" "}
+          Pendiente por guardar disponible:{" "}
           <b>
             {cash.session && !cash.loading && !cash.error
               ? formatMoney(

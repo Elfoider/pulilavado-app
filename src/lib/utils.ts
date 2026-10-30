@@ -45,6 +45,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.5.2 - Actividad de servicios";
+export const versionSoft = "v1.5.3 - Efectivo y sobres";
 
 

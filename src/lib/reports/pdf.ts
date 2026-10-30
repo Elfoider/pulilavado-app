@@ -35,7 +35,7 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   };
   const cash = reportCashView(report);
   const cashLabel = cash.balance === null ? "No disponible" : dollars(cash.balance);
-  const netLabel = dollars(cash.net);
+  const netLabel = dollars(cash.generated);
   const periodMode = !!report.periodCash;
   box(0, 0, 210, 3, cyan);
   text(12, 15, "MR. ESPUMA / PULILAVADO", 10, cyan, true);
@@ -46,12 +46,12 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   box(12, 48, 186, 33, green);
   text(18, 57, "EFECTIVO A GUARDAR DE LA JORNADA", 11, "#FFFFFF", true);
   text(18, 73, netLabel, 30, "#FFFFFF", true);
-  text(18, 78, "SIN FONDO INICIAL", 7, "#D8F1E6", true);
-  if (cash && cash.reconciled && cash.net >= 0 && cash.outgoing >= 0 && cash.incoming > 0) {
+  text(18, 78, `Guardado en sobres ${dollars(cash.saved)} · Pendiente ${dollars(cash.pending)}`, 7, "#D8F1E6", true);
+  if (cash && cash.reconciled && cash.generated >= 0 && cash.operatingOutgoing >= 0 && cash.generated+cash.operatingOutgoing > 0) {
     text(151, 55, "EFECTIVO DE LA JORNADA", 6, "#FFFFFF", true);
-    donut(160, 66, 9, [cash.net, cash.outgoing], ["#83DEB8", "#F7BC58"], dollars(cash.incoming), green, "#FFFFFF");
-    text(174, 63, `Guardar ${dollars(cash.net)}`, 7, "#FFFFFF");
-    text(174, 69, `Salidas ${dollars(cash.outgoing)}`, 7, "#FFFFFF");
+    donut(160, 66, 9, [cash.generated, cash.operatingOutgoing], ["#83DEB8", "#F7BC58"], dollars(cash.generated+cash.operatingOutgoing), green, "#FFFFFF");
+    text(174, 63, `Jornada ${dollars(cash.generated)}`, 7, "#FFFFFF");
+    text(174, 69, `Pagos ${dollars(cash.operatingOutgoing)}`, 7, "#FFFFFF");
   }
   box(12, 85, 91, 24, "#F2F6F8"); box(107, 85, 91, 24, "#F2F6F8");
   text(17, 92, periodMode ? "SALDOS FINALES DEL PERÍODO" : "SALDO TOTAL EN CAJA", 9, muted, true); text(17, 103, cashLabel, 21, navy, true);
@@ -83,12 +83,13 @@ export function financialPDF(report: FinancialReport, doc = new jsPDF()) {
   const left = [
     [periodMode ? "Fondos iniciales acumulados" : "Fondo inicial", cash.opening === null ? "No disponible" : dollars(cash.opening)],
     ["Entradas netas en efectivo", cash?.reconciled ? dollars(cash.incoming) : "No disponible"],
-    ["Pagos y gastos en efectivo", cash?.reconciled ? dollars(cash.outgoing) : "No disponible"],
+    ["Pagos y gastos en efectivo", cash?.reconciled ? dollars(cash.operatingOutgoing) : "No disponible"],
+    ["Traslados a sobres", dollars(cash.saved)],
     [periodMode ? "Saldos finales acumulados" : "Saldo total en caja", cashLabel],
     ["Efectivo a guardar de la jornada", netLabel],
   ];
-  left.forEach(([label, value], i) => { text(16, 217 + i * 8, label, 8, i === 4 ? green : navy, i >= 3); text(104, 217 + i * 8, value, 10, i === 4 ? green : navy, i >= 3, true); });
-  [["Comisiones generadas", dollars(report.payroll)], ["Ventas menos comisiones", dollars(report.business)], ["Propinas recibidas", dollars(totalTips)], ["Salidas de efectivo", cash?.reconciled ? dollars(cash.outgoing) : "No disponible"]].forEach(([label, value], i) => { text(117, 217 + i * 8, label, 8); text(194, 217 + i * 8, value, 9, navy, i === 1, true); });
+  left.forEach(([label, value], i) => { text(16, 217 + i * 6.8, label, 8, i === 5 ? green : navy, i >= 3); text(104, 217 + i * 6.8, value, 10, i === 5 ? green : navy, i >= 3, true); });
+  [["Comisiones generadas", dollars(report.payroll)], ["Ventas menos comisiones", dollars(report.business)], ["Propinas recibidas", dollars(totalTips)], ["Pagos y gastos", cash?.reconciled ? dollars(cash.operatingOutgoing) : "No disponible"]].forEach(([label, value], i) => { text(117, 217 + i * 8, label, 8); text(194, 217 + i * 8, value, 9, navy, i === 1, true); });
   text(117, 253, "Antes de costos y gastos.", 7, muted);
   text(12, 269, periodMode ? report.periodCash?.statusLabel ?? `${cash.sessionCount} caja(s) con movimientos en el período` : report.session?.status === "open" ? "Caja abierta" : "Caja cerrada / sin apertura", 8, muted);
   text(198, 269, periodMode ? "Saldos al último movimiento del rango" : "Datos de la caja consultada", 7, muted, false, true);

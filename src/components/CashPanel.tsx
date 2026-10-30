@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import CashSavings from "./CashSavings";
 import HelpTip from "./HelpTip";
 import SectionLink from "./SectionLink";
 import { ArrowUpRight, Banknote, Coins, HandCoins, Plus, ShieldCheck, Wallet } from "lucide-react";
@@ -213,7 +214,7 @@ export default function CashPanel() {
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-cyan-950 p-5 text-white"><div className="flex items-center justify-between gap-2 text-cyan-100"><p className="text-xs font-bold uppercase tracking-wide">Efectivo esperado</p><Banknote className="h-5 w-5"/></div><p className="text-4xl font-black mt-3">${session.balances.Efectivo.toFixed(2)}</p><p className="text-xs text-cyan-100 mt-2">Incluye el fondo inicial</p></div>
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5"><div className="flex justify-between gap-2 text-emerald-800"><p className="text-xs font-bold uppercase tracking-wide">Efectivo a guardar de la jornada</p><ShieldCheck className="h-5 w-5 shrink-0"/></div><p className="text-4xl font-black text-emerald-900 mt-3">${(session.balances.Efectivo-session.openingAmount).toFixed(2)}</p><div className="mt-2"><HelpTip label="Cómo se calcula">Efectivo esperado menos fondo inicial. Ya descuenta gastos, retiros, vales y lo trasladado a sobres.</HelpTip></div></div>
+              <CashSavings session={session}/>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{METHODS.filter(method=>method!=="Efectivo").map(method=><div key={method} className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"><p className="text-xs font-bold text-slate-500">{method}</p><p className="text-xl font-bold text-slate-800 mt-1">${session.balances[method].toFixed(2)}</p></div>)}</div>
             <div className="flex flex-wrap gap-6 text-sm">

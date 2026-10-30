@@ -140,6 +140,7 @@ async function main() {
     145,
   );
   await page.goto("http://127.0.0.1:3100/reports");
+  await page.getByRole("button",{name:"Esta Semana",exact:true}).click();
   await page
     .getByRole("button", { name: "Reporte de Pago de Nómina (PDF)" })
     .waitFor();
@@ -180,6 +181,12 @@ async function main() {
     (await getDoc(doc(db, "cashSessions/c"))).data().balances.Efectivo,
     65,
   );
+  await page.goto("http://127.0.0.1:3100/cash");
+  await page.waitForFunction(()=>[...document.querySelectorAll('[aria-label="Efectivo a guardar de la jornada"]')].some(node=>node.textContent.includes('$80.00')));
+  assert.ok((await page.getByLabel("Guardado en sobres",{exact:true}).textContent()).includes("$80.00"));assert.ok((await page.getByLabel("Pendiente por guardar",{exact:true}).textContent()).includes("$0.00"));
+  await page.goto("http://127.0.0.1:3100/reports");await page.getByRole("button",{name:"Esta Semana",exact:true}).click();await page.getByRole("button",{name:/Reporte financiero \(Excel\)/}).waitFor();
+  const savedExcel=page.waitForEvent("download");await page.getByRole("button",{name:/Reporte financiero \(Excel\)/}).click();await(await savedExcel).saveAs(output+"/saved.xlsx");const savedBook=XLSX.readFile(output+"/saved.xlsx");assert.equal(savedBook.Sheets.Resumen.A6.v,80);assert.equal(savedBook.Sheets.Resumen.F25.v,80);assert.equal(savedBook.Sheets.Resumen.F31.v,0);
+  await page.goto("http://127.0.0.1:3100/envelopes");
   await page
     .getByRole("button", { name: "Usar dinero de este sobre", exact: true })
     .click();
@@ -255,6 +262,7 @@ async function main() {
     fullPage: true,
   });
   await page.goto("http://127.0.0.1:3100/reports");
+  await page.getByRole("button",{name:"Esta Semana",exact:true}).click();
   await page.getByText("Control semanal:", { exact: false }).waitFor();
   assert.ok(
     (

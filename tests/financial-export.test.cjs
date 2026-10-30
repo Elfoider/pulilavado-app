@@ -65,3 +65,19 @@ test('cash breakdown nets corrected receipts and keeps expenses, advances and tr
   row('expense',-5),row('withdrawal',-7),row('payroll_advance',-20),row('envelope_deposit',-30),row('envelope_to_cash',10),row('income',4),row('expense',-99,'Tarjeta'),
  ]),{collections:7,expenses:5,withdrawals:7,savedToEnvelopes:30,fromEnvelopes:10,funding:4});
 });
+
+test('historical saving to envelopes retains generated cash in PDF and Excel without changing ledger or physical balances',()=>{
+ const {summarizePeriodCash,reportCashView}=require('../.test-build/reports/cash.js');
+ const events=[['opening',65],['service_payment',100],['expense',-10],['payroll_advance',-20],['envelope_deposit',-70]].map(([kind,amount],i)=>({id:`old-${i}`,sessionId:'historic',method:'Efectivo',kind,amount,description:kind,referenceId:`ref-${i}`,createdAt:{seconds:1000+i}}));
+ const historical={...session,id:'historic',status:'closed',openingAmount:65,balances:{...balances(),Efectivo:65}};
+ const original=structuredClone(events);const movements=detailMovements(events,historical);const data={...report,session:null,movements,periodCash:summarizePeriodCash(movements)};const cash=reportCashView(data);
+ assert.equal(cash.generated,70);assert.equal(cash.saved,70);assert.equal(cash.pending,0);assert.equal(cash.operatingOutgoing,30);assert.equal(cash.net,0);assert.equal(cash.balance,65);assert.equal(cash.reconciled,true);assert.deepEqual(events,original);
+ const wb=XLSX.read(financialExcel(data),{type:'array'});assert.equal(wb.Sheets.Resumen.A6.v,70);assert.equal(wb.Sheets.Resumen.F22.v,30);assert.equal(wb.Sheets.Resumen.F25.v,70);assert.equal(wb.Sheets.Resumen.F31.v,0);assert.equal(wb.Sheets.Movimientos.E6.v,-70);assert.equal(wb.Sheets.Movimientos.C6.v,'Traslado a sobre');
+ const doc=new (require('jspdf').jsPDF)();const texts=[];const draw=doc.text.bind(doc);doc.text=(...args)=>{texts.push(args[0]);return draw(...args)};financialPDF(data,doc);assert.ok(texts.includes('$70.00'));assert.ok(texts.includes('Guardado en sobres $70.00 · Pendiente $0.00'));assert.equal(doc.getNumberOfPages(),1);
+});
+test('partial saving and envelope refills preserve generated earnings without creating new income',()=>{
+ const {cashSavings}=require('../.test-build/reports/cash.js');const row=(kind,amount)=>({kind,amount,method:'Efectivo'});
+ assert.deepEqual(cashSavings([row('envelope_deposit',-40)],30,70),{generated:70,saved:40,pending:30,operatingOutgoing:30});
+ assert.deepEqual(cashSavings([row('envelope_deposit',-70),row('envelope_to_cash',20),row('income',10)],30,100),{generated:70,saved:70,pending:30,operatingOutgoing:30});
+ assert.equal(cashSavings([row('envelope_deposit',-70),row('envelope_to_cash',20),row('expense',-20)],0,120).generated,50);
+});

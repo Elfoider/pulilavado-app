@@ -319,3 +319,9 @@ test("full week: cash sales, advance, saving, final payroll and next-week emerge
   assert.equal(f.week("2026-10-27").netGenerated, 50);
   assert.equal(f.week("2026-10-27").envelopeBalance, 45);
 });
+
+test('saving and closing preserve generated journal totals while real cash moves and historical records remain untouched',async()=>{
+ const {detailMovements,summarizePeriodCash}=require('../.test-build/reports/cash.js');const f=fixture();await f.api.openCash(65,'c');await f.api.saveService({clientName:'Demo',clientPhone:'',vehicle:{model:'Auto',color:'Blanco',bay:'1'},washerId:'a',servicePrice:100,paymentStatus:'paid',paymentMethod:'Efectivo',tipAmount:0,tipMethod:'Efectivo',cart:[]},'s',true);await f.api.cashMove(10,'Efectivo','expense','Gasto real','expense');await f.api.registerAdvance('a',20,'Vale','vale');
+ await f.api.depositEnvelope(70,'Cierre de jornada','deposit');assert.equal(f.docs.get('cashSessions/c').balances.Efectivo,65);assert.equal(f.docs.get('cashSessions/c').expenses,30);assert.equal(f.docs.get('cashEnvelopes/2026-10-27').balance,70);
+ await f.api.closeCash('c',65,'Cierre');const before=structuredClone([...f.docs]);const rows=detailMovements(f.rows('cashMovements'),f.docs.get('cashSessions/c'));const summary=summarizePeriodCash(rows);assert.equal(summary.generated,70);assert.equal(summary.pending,0);assert.equal(summary.saved,70);assert.deepEqual([...f.docs],before);
+});
