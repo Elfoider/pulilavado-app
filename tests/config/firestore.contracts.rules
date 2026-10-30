@@ -1,0 +1,46 @@
+rules_version = '2';
+// Local contract rehearsal only. Operational writes require authenticated V2 APIs.
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signed() { return request.auth != null; }
+  function profile() { return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data; }
+  function membership(org) { return get(/databases/$(database)/documents/organizations/$(org)/memberships/$(request.auth.uid)).data; }
+  function role(org) { return get(/databases/$(database)/documents/organizations/$(org)/roles/$(membership(org).roleId)).data; }
+  function active(org) {
+   return signed() && profile().uid == request.auth.uid && profile().organizationId == org && profile().status == 'active'
+    && get(/databases/$(database)/documents/organizations/$(org)).data.status == 'active'
+    && membership(org).uid == request.auth.uid && membership(org).organizationId == org && membership(org).status == 'active'
+    && role(org).organizationId == org && role(org).status == 'active';
+  }
+  function assigned(org, branch) { return membership(org).allBranches == true || branch in membership(org).branchIds; }
+  function dashboard(org, branch) {
+   return active(org) && assigned(org, branch)
+    && get(/databases/$(database)/documents/organizations/$(org)/branches/$(branch)).data.organizationId == org
+    && get(/databases/$(database)/documents/organizations/$(org)/branches/$(branch)).data.status == 'active'
+    && !('dashboard.view' in membership(org).denies)
+    && (role(org).permissions.get('dashboard.view', '') in ['branch','organization'] || membership(org).grants.get('dashboard.view', '') in ['branch','organization']);
+  }
+  match /profiles/{uid} { allow get: if signed() && request.auth.uid == uid; allow list, write: if false; }
+  match /organizations/{org} {
+   allow get: if active(org); allow list, write: if false;
+   match /memberships/{uid} {
+    allow get: if signed() && request.auth.uid == uid && profile().organizationId == org;
+    allow list, write: if false;
+   }
+   match /roles/{roleId} {
+    allow get: if active(org) && roleId == membership(org).roleId && resource.data.organizationId == org;
+    allow list, write: if false;
+   }
+   match /branches/{branch} {
+    allow get: if active(org) && assigned(org, branch) && resource.data.organizationId == org && resource.data.status == 'active';
+    allow list: if active(org) && membership(org).allBranches == true && resource.data.organizationId == org && resource.data.status == 'active';
+    allow write: if false;
+    match /summaries/{id} {
+     allow get: if id == 'baseline' && resource.data.organizationId == org && resource.data.branchId == branch && dashboard(org, branch);
+     allow list, write: if false;
+    }
+   }
+  }
+  match /{path=**} { allow read, write: if false; }
+ }
+}

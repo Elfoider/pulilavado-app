@@ -2,6 +2,8 @@
 
 Rama: **MigracionDevV2**. Base: producción 1.5.3, commit `652923fc5e1cac61b55ea227c0b4fdd523e88fe8`. Esta rama es un puente de diagnóstico, no una sustitución desplegable del sistema original ni una V2 completa.
 
+El ensayo de acceso y sedes de la fase 2 tiene un entorno independiente. Consulte [FASE_2_ACCESO.md](FASE_2_ACCESO.md) antes de iniciarlo; no usa las reglas permisivas de regresión indicadas más abajo.
+
 ## Decisión
 
 Comenzar la migración. No ampliar primero el sistema original con más módulos: sus reglas transaccionales ya tienen pruebas, pero la identidad, el aislamiento por sede y el acceso a datos deben resolverse en el destino V2. Consulte ANALISIS_Y_PLAN.md para prioridades y límites.

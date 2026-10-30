@@ -13,6 +13,7 @@ jobs:
     env:
       NEXT_PUBLIC_MIGRATION_SANDBOX: "false"
       NEXT_PUBLIC_USE_FIREBASE_EMULATOR: "false"
+      NEXT_PUBLIC_V2_CONTRACTS_SANDBOX: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,3 +26,18 @@ jobs:
       - run: npm test
       - run: npm run migration:check -- examples/migration/demo-snapshot.json --organization demo-organizacion --branch principal
       - run: npm run build
+  access-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --no-audit --no-fund
+      - run: npx --yes firebase-tools@15.32.1 emulators:exec --config tests/config/firebase.contracts.json --project demo-pulilavado-contracts --only auth,firestore "npm run test:access"

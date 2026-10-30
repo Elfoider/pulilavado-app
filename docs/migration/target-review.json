@@ -1,0 +1,97 @@
+{
+  "format": "pulilavado-target-contract-review-v1",
+  "reviewedAt": "2026-10-30",
+  "source": "Copia local de Pulix V2 disponible en el espacio de trabajo; sin metadatos Git. No se certifica el despliegue remoto.",
+  "sourceModified": false,
+  "cloudAccess": false,
+  "files": [
+    {
+      "path": "package.json",
+      "sha256": "0e75c4f081e7c7f460b683396c79ffc8a9ca9a89f2f07def1c5ed91ccc27763e"
+    },
+    {
+      "path": "src/types/core.ts",
+      "sha256": "52255941b3eb68b23ed159265c89c5e6c81cd0753674c36c4036efbd66cae2c6"
+    },
+    {
+      "path": "src/constants/permissions.ts",
+      "sha256": "45a990e958e5a1739765d81341f76e71c59a4d71067160d8528d73bb7a359904"
+    },
+    {
+      "path": "src/lib/auth/server.ts",
+      "sha256": "14e60f3abf90f6d96033d27b30ce9bda03497843b8f53e0a50f065ea0b561d63"
+    },
+    {
+      "path": "src/lib/permissions/effective.ts",
+      "sha256": "d45b048fdb54bcd9bf22611506cb0767afda9038fb97d5464aa457fe487c9fee"
+    },
+    {
+      "path": "src/lib/firebase/database.ts",
+      "sha256": "9bb6ef331f32fe075f3f68ebcb895a7e54c65fe7d9cc27d8e4c1c7650ccb08b9"
+    },
+    {
+      "path": "src/features/context/server-repository.ts",
+      "sha256": "2fc906ddc702ff2d5bc5481a7ea50ece639683bdc5cac3365b5e62dab6d51e78"
+    },
+    {
+      "path": "src/features/admin/server-repository.ts",
+      "sha256": "013507fe8cf410b39d7b2cd0477834f43ecafa4f11657465dd7fe491923c5977"
+    },
+    {
+      "path": "src/features/registry/server-repository.ts",
+      "sha256": "abf3416db2b0054bf8bab8d88aa1389df1a1ba39238ac810ea022236bac5722d"
+    },
+    {
+      "path": "src/features/master/server-repository.ts",
+      "sha256": "cb661d9714887560b1d07eb8f1b7489148a6b661dcee10ac1d67be3a79e7c666"
+    },
+    {
+      "path": "src/features/operations/model.ts",
+      "sha256": "6ccaaeede57109662532ddf9eb59a4d23f51d407591db08cbaa7889af3041d18"
+    },
+    {
+      "path": "src/features/operations/server-repository.ts",
+      "sha256": "4e7c73caca058197f1de8f6736db9a308c9750fcace979a3138a51c542dbb50b"
+    },
+    {
+      "path": "src/features/finance/model.ts",
+      "sha256": "1925cac435b997a7fe58df1bd634b6f372aab983a5951f206cc4c5a40cdb60a2"
+    },
+    {
+      "path": "src/features/finance/server-repository.ts",
+      "sha256": "548989123393e37f4f5586a802b38844ff158fb00ee909e0e0dca64daa4a1c55"
+    },
+    {
+      "path": "src/features/cash/model.ts",
+      "sha256": "81f41a6d63e96e711e8ad95aa843947c10670815ba82f4b8d83bd414683da14b"
+    },
+    {
+      "path": "src/features/cash/server-repository.ts",
+      "sha256": "5bf251b4e9de8c2a44be5bae8a9dd7b9a04437a03c5510a5477571515b92fab1"
+    },
+    {
+      "path": "src/features/inventory/model.ts",
+      "sha256": "67738c96a5205c609ab55f8ca371afba38d1a02360c45229ad6b88c166545678"
+    },
+    {
+      "path": "src/features/inventory/server-repository.ts",
+      "sha256": "2eced7f15aa76bed910ae90a3187602291e39356a3343e9bbaadb1b415a25d60"
+    },
+    {
+      "path": "src/features/sales/server-repository.ts",
+      "sha256": "2248c5a5a6efd7e2d446dd1fbe9cc8ba152b357f2a6cb32621d0b12c0c620610"
+    },
+    {
+      "path": "src/features/reports/model.ts",
+      "sha256": "4588850c9b680ef0e8e1a89c6dd97ff3d3e95bf054c8214a44e638a254e41b21"
+    },
+    {
+      "path": "src/features/reports/server-repository.ts",
+      "sha256": "f98abf28014f2f102354774dd8ffac6c8cceddb0a05b35d34eee37b9f668d609"
+    },
+    {
+      "path": "firestore.rules",
+      "sha256": "12bd81b5b777c160ba2ac96c7529f49ce81639328002d637ea3de6943fb3c753"
+    }
+  ]
+}

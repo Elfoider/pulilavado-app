@@ -47,7 +47,8 @@ Esta reorganización es una etapa de preparación entre el diagnóstico de migra
 - `settings`: configuración del negocio.
 - `reports`: resumen de actividad, nómina, finanzas y exportaciones.
 - `operations`: reglas y transacciones compartidas que coordinan dinero, stock y servicios.
-- `migration`: auditoría de copia y centro de diagnóstico.
+- `migration`: auditoría de copia, contratos de destino y centro de diagnóstico.
+- `access`: contratos de identidad/permisos, casos de uso y laboratorio local de sedes.
 
 Cada módulo contiene solo las capas que ya necesita. No se crean carpetas vacías para funciones futuras.
 

@@ -1,13 +1,16 @@
 # MigracionDevV2 — preparación de migración
 
-Esta rama contiene la **fase 1 de migración y la reestructuración modular previa a V2**. Producción permanece en `master` (1.5.3). No despliegue esta rama en el backend productivo: las pantallas operativas están limitadas al emulador local.
+Esta rama contiene la **fase 1 de migración, la reestructuración modular y la preparación técnica de acceso y sedes V2**. Producción permanece en `master` (1.5.3). No despliegue esta rama en el backend productivo: las pantallas operativas están limitadas al emulador local.
 
+- [Probar acceso y sedes: fase 2](docs/migration/FASE_2_ACCESO.md)
+- [Contratos y diferencias con Pulix V2](docs/migration/CONTRATOS_DESTINO.md)
 - [Estructura de carpetas y reglas para nuevas funciones](docs/architecture/STRUCTURE.md)
 - [Análisis y plan de fases](docs/migration/ANALISIS_Y_PLAN.md)
 - [Uso del centro de migración y herramienta local](docs/migration/README.md)
 - [Decisión de arquitectura](docs/migration/ADR-001.md)
 - [Validación de la fase 1](docs/migration/VALIDACION.md)
 - [Validación de la reestructuración](docs/validation/REESTRUCTURACION_V2.md)
+- [Validación técnica de acceso y sedes](docs/validation/FASE_2_ACCESO.md)
 
 Abra `/migration` para revisar el ejemplo ficticio. No se importan datos ni se conecta a la base del proyecto Pulix V2. Las instrucciones originales siguientes se conservan como referencia histórica; para esta rama prevalece la guía de migración.
 
