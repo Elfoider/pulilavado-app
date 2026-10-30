@@ -1,14 +1,15 @@
 {
   "name": "pulilavado-app",
-  "version": "2.0.0-dev.1",
+  "version": "2.0.0-dev.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsc src/lib/operations/model.ts src/lib/operations/core.ts src/lib/migration/audit.ts src/lib/migration/runtime.ts src/lib/reports/activity.ts src/lib/reports/cash.ts src/lib/reports/pdf.ts src/lib/reports/excel.ts --outDir .test-build --module commonjs --target ES2022 --skipLibCheck --strict --esModuleInterop && node --test tests/*.test.cjs",
-    "migration:check": "tsc src/lib/migration/audit.ts --outDir .migration-build --module commonjs --target ES2022 --skipLibCheck --strict --esModuleInterop && node scripts/migration-check.mjs"
+    "test": "node scripts/quality/test-unit.mjs",
+    "migration:check": "tsc src/features/migration/domain/audit.ts --rootDir src --outDir .migration-build --module commonjs --target ES2022 --skipLibCheck --strict --esModuleInterop && node scripts/migration/migration-check.mjs",
+    "check:architecture": "node scripts/quality/check-architecture.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

@@ -1,4 +1,4 @@
-import WashersManager from "@/components/WashersManager";
+import WashersManager from "@/features/washers/components/WashersManager";
 
 export default function WashersPage() {
   return (

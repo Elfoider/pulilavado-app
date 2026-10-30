@@ -20,7 +20,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run check:architecture
       - run: npm run lint
       - run: npm test
-      - run: npm run migration:check -- fixtures/migration/demo-snapshot.json --organization demo-organizacion --branch principal
+      - run: npm run migration:check -- examples/migration/demo-snapshot.json --organization demo-organizacion --branch principal
       - run: npm run build

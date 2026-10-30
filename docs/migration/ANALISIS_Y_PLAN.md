@@ -29,6 +29,7 @@ Los hallazgos son del código. No se afirma que existan inconsistencias específ
 ## Fases propuestas
 
 1. **Preparación y diagnóstico — implementada en esta rama.** Aislamiento de entorno, centro de migración local, contrato de copia, auditoría automática, diagnóstico CLI, ejemplo ficticio y pruebas. No importa datos ni declara terminada Auth.
+   - **Preparación estructural — implementada en `2.0.0-dev.2`.** Carpetas por módulo y capa, rutas ligeras, infraestructura y componentes compartidos separados, pruebas organizadas y control de dependencias. Consulte [la estructura del proyecto](../architecture/STRUCTURE.md).
 2. **Contratos de destino y seguridad.** Cotejar Pulix V2 real, organización/sede de destino, permisos, reglas y administración; decidir mapeos de clientes, vehículos, personal, catálogo y configuración. Las decisiones comerciales abiertas en los documentos V2 se cierran aquí antes de transformar datos.
 3. **Ensayo de catálogos y entidades maestras.** Transformador versionado e importador idempotente a entorno de ensayo autorizado; IDs de origen, manifest/checkpoints, conflictos y reversión. Nada de copiar controles globales del origen ni cargar directamente en la base V2 existente.
 4. **Operación y finanzas.** Servicios, productos, pagos, comisiones, vales, sobres y Caja; pagos de nómina documentados. Conciliar por método/sesión y contrastar reportes antiguos/nuevos. Los traslados siguen siendo movimientos internos.

@@ -1,0 +1,498 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { db } from "@/infrastructure/firebase/client";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  getDoc,
+  query,
+  where,
+  Timestamp,
+  doc,
+  setDoc,
+} from "firebase/firestore"; // <--- AGREGADO getDoc
+import {
+  X,
+  Car,
+  User,
+  Phone,
+  Save,
+  CheckCircle,
+  AlertCircle,
+  Coins,
+  Palette,
+} from "lucide-react";
+import HelpTip from "@/shared/ui/HelpTip";
+import PaymentEditor from "@/features/payments/components/PaymentEditor";
+import ServiceCatalogPicker from "@/features/catalog/components/ServiceCatalogPicker";
+import ProductCart from "@/features/inventory/components/ProductCart";
+import { operations, newId } from "@/features/operations";
+import { CartItem, commission, PaymentPart, ServiceLine, money } from "@/features/operations/domain/model";
+import { Washer } from "@/features/washers/domain/types";
+import MoneyInput from "@/shared/ui/MoneyInput";
+import { enqueueSnackbar } from "notistack";
+
+interface Props {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  vehicleModel: string;
+  vehicleColor: string;
+}
+
+export default function NewServiceModal({ isOpen, onClose, onSuccess }: Props) {
+  const [serviceItems,setServiceItems]=useState<ServiceLine[]>([]);
+  const [payments,setPayments]=useState<PaymentPart[]>([]);
+  const [productsTotal,setProductsTotal]=useState(0);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [requestId, setRequestId] = useState(newId);
+  const [loading, setLoading] = useState(false);
+  const [washers, setWashers] = useState<Washer[]>([]);
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [filteredClients, setFilteredClients] = useState<Client[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // --- CONFIGURACIÓN GLOBAL ---
+  const [commissionPercent, setCommissionPercent] = useState(40); // Por defecto 35%
+
+  // --- ESTADOS DEL FORMULARIO ---
+  const [track, setTrack] = useState("0");
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleColor, setVehicleColor] = useState("");
+  const [selectedWasherId, setSelectedWasherId] = useState("");
+
+  // 1. ESTADO DE PAGO
+  const [isPending, setIsPending] = useState(false);
+
+  // 2. DATOS DE COBRO
+  const [price, setPrice] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState("Efectivo");
+
+  // 3. ESTADOS DE PROPINA
+  const [hasTip, setHasTip] = useState(false);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [tipMethod, setTipMethod] = useState("Efectivo");
+
+  useEffect(() => {
+    if (isOpen) {
+      const initData = async () => {
+        try {
+          // 1. Cargar Lavadores
+          const qWashers = query(
+            collection(db, "washers"),
+            where("active", "==", true),
+          );
+          const snapWashers = await getDocs(qWashers);
+          setWashers(
+            snapWashers.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as Washer,
+            ),
+          );
+
+          // 2. Cargar Clientes
+          const snapClients = await getDocs(collection(db, "clients"));
+          setAllClients(
+            snapClients.docs.map(
+              (doc) => ({ id: doc.id, ...doc.data() }) as Client,
+            ),
+          );
+
+          // 3. CARGAR COMISIÓN GLOBAL (NUEVO)
+          const settingsSnap = await getDoc(doc(db, "settings", "global"));
+          if (settingsSnap.exists()) {
+            setCommissionPercent(
+              settingsSnap.data()?.defaultCommissionPercentage ?? 40,
+            );
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      initData();
+
+      // Resetear formulario
+      setCart([]);
+      setServiceItems([]);setPayments([]);setProductsTotal(0);
+      setRequestId(newId());
+      setClientName("");
+      setClientPhone("");
+      setVehicleModel("");
+      setVehicleColor("");
+      setSelectedWasherId("");
+      setIsPending(false);
+      setPrice(0);
+      setPaymentMethod("Efectivo");
+      setHasTip(false);
+      setTipAmount(0);
+      setTipMethod("Yappy");
+      setShowSuggestions(false);
+      setTrack("0");
+    }
+  }, [isOpen]);
+
+  // ... (Funciones handleNameChange y selectClient IGUALES que antes) ...
+  const handleNameChange = (text: string) => {
+    setClientName(text);
+    if (text.length > 1) {
+      const search = text.toLowerCase();
+      const results = allClients.filter((c) =>
+        c.name.toLowerCase().includes(search),
+      );
+      setFilteredClients(results);
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectClient = (client: Client) => {
+    setClientName(client.name);
+    setClientPhone(client.phone);
+    setVehicleModel(client.vehicleModel);
+    setVehicleColor(client.vehicleColor);
+    setShowSuggestions(false);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedWasherId || !vehicleModel || track === "0") {
+      alert("Seleccione vehículo, lavador y pista.");
+      return;
+    }
+    if (!isPending && price <= 0 && cart.length === 0) {
+      alert("Por favor ingrese el precio del servicio.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await operations.saveService({
+        clientName: clientName || "Cliente General", clientPhone: clientPhone || "N/A",
+        vehicle: { model: vehicleModel, color: vehicleColor || "No especificado", bay: track },
+        washerId: selectedWasherId, servicePrice: price,
+        paymentStatus: isPending ? "pending" : "paid", paymentMethod, payments: paymentMethod === "Mixto" ? payments : undefined, serviceItems,
+        tipAmount: hasTip ? tipAmount : 0, tipMethod, cart,
+      }, requestId, true);
+
+      try {
+      if (clientName) {
+        const existingClient = allClients.find(
+          (c) => c.name.toLowerCase() === clientName.toLowerCase(),
+        );
+        const clientData = {
+          name: clientName,
+          phone: clientPhone,
+          vehicleModel,
+          vehicleColor,
+          lastVisit: Timestamp.now(),
+        };
+        if (existingClient) {
+          await setDoc(doc(db, "clients", existingClient.id), clientData, {
+            merge: true,
+          });
+        } else {
+          await addDoc(collection(db, "clients"), clientData);
+        }
+      }
+      } catch (clientError) {
+        console.error(clientError);
+        enqueueSnackbar("Servicio guardado; no se pudo actualizar la ficha del cliente.", { variant: "warning" });
+      }
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error(error);
+      enqueueSnackbar(error instanceof Error ? error.message : "Error al guardar el servicio.", { variant: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  // ... (El return / JSX es IDÉNTICO al anterior, no cambia nada visualmente) ...
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* HEADER */}
+        <div className="bg-espuma-blue p-5 flex justify-between items-center text-white">
+          <div>
+            <h2 className="text-xl font-black italic tracking-wider">
+              NUEVO SERVICIO
+            </h2>
+            <p className="text-cyan-100 text-xs font-bold uppercase">
+              Ingreso de Vehículo
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition text-white"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
+          {/* 1. SELECCIÓN DE LAVADOR */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Lavador Asignado *
+              </label>
+              <select
+                required
+                value={selectedWasherId}
+                onChange={(e) => setSelectedWasherId(e.target.value)}
+                className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
+              >
+                <option value="">Seleccionar...</option>
+                {washers.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Pista *
+              </label>
+              <select
+                required
+                value={track}
+                onChange={(e) => setTrack(e.target.value)}
+                className="w-full p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 h-[52px] outline-none focus:ring-2 focus:ring-espuma-blue"
+              >
+                <option value="0">Seleccionar...</option>
+                <option value="1">Pista #1</option>
+                <option value="2">Pista #2</option>
+                <option value="3">Pista #3</option>
+                <option value="4">Pista #4</option>
+                <option value="5">Pista #5</option>
+                <option value="6">Pista #6</option>
+                <option value="7">Pista #7</option>
+                <option value="8">Pista #8</option>
+                <option value="9">Pista #9</option>
+                <option value="10">Pista #10</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 2. DATOS DEL CLIENTE */}
+          <div className="space-y-4 pt-2 border-t border-gray-100">
+            <div className="relative">
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Cliente
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar o escribir nuevo..."
+                  value={clientName}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  onBlur={() =>
+                    setTimeout(() => setShowSuggestions(false), 200)
+                  }
+                  className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 focus:ring-2 focus:ring-espuma-blue outline-none"
+                />
+              </div>
+              {showSuggestions && filteredClients.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-40 overflow-y-auto">
+                  {filteredClients.map((client) => (
+                    <div
+                      key={client.id}
+                      onClick={() => selectClient(client)}
+                      className="p-3 hover:bg-cyan-50 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-0"
+                    >
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm">
+                          {client.name}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {client.vehicleModel}
+                        </p>
+                      </div>
+                      <CheckCircle className="w-4 h-4 text-espuma-blue" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                Teléfono
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <input
+                  type="tel"
+                  placeholder="6xxx-xxxx"
+                  value={clientPhone}
+                  onChange={(e) => setClientPhone(e.target.value)}
+                  className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-medium text-gray-800 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Vehículo *
+                </label>
+                <div className="relative">
+                  <Car className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    required
+                    placeholder="Modelo"
+                    value={vehicleModel}
+                    onChange={(e) => setVehicleModel(e.target.value)}
+                    className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                  Color *
+                </label>
+                <div className="relative">
+                  <Palette className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                  <input
+                    required
+                    placeholder="Color"
+                    value={vehicleColor}
+                    onChange={(e) => setVehicleColor(e.target.value)}
+                    className="w-full pl-10 p-3 bg-gray-50 border-gray-200 rounded-xl font-bold text-gray-800 outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 my-2"></div>
+
+          {/* 3. SWITCH DE ESTADO DE PAGO */}
+          <div className="bg-gray-100 p-1.5 rounded-xl flex">
+            <button
+              type="button"
+              onClick={() => setIsPending(false)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${!isPending ? "bg-white text-espuma-blue shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Cobrar Ahora
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPending(true)}
+              className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${isPending ? "bg-red-500 text-white shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Pago Pendiente
+            </button>
+          </div>
+
+          <ServiceCatalogPicker value={serviceItems} onChange={lines=>{setServiceItems(lines);setPrice(money(lines.reduce((sum,line)=>sum+line.unitPrice,0)));}}/>
+          {serviceItems.length ? <p className="font-bold">Total de servicios: ${price.toFixed(2)}</p> : <MoneyInput label="Servicio personalizado ($)" value={price} onChange={setPrice}/>}
+          {/* 4. SECCIÓN FINANCIERA (CONDICIONAL) */}
+          {isPending ? (
+            // --- MODO PENDIENTE ---
+            <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-center animate-in fade-in zoom-in-95 duration-200">
+              <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-red-800 font-bold">Servicio por Pagar</p>
+              <p className="text-red-600 text-xs mt-1">
+                Puede indicar el precio previsto del lavado y agregar productos. Al guardar, se reservan las unidades; el cobro se registra cuando el cliente pague.
+              </p>
+            </div>
+          ) : (
+            // --- MODO PAGADO (Inputs visibles) ---
+            <div className="space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl space-y-3">
+                <PaymentEditor method={paymentMethod} payments={payments} total={money(price+productsTotal)} onChange={(method,parts)=>{setPaymentMethod(method);setPayments(parts);}}/>
+              </div>
+
+              {/* SECCIÓN DE PROPINA */}
+              <div
+                className={`p-4 rounded-xl border transition-all duration-300 ${hasTip ? "bg-yellow-50 border-yellow-200" : "bg-gray-50 border-gray-200"}`}
+              >
+                <div
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => setHasTip(!hasTip)}
+                >
+                  <div
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${hasTip ? "bg-yellow-500 border-yellow-500" : "border-gray-400 bg-white"}`}
+                  >
+                    {hasTip && (
+                      <CheckCircle className="w-3.5 h-3.5 text-white" />
+                    )}
+                  </div>
+                  <label className="text-sm font-bold text-gray-700 cursor-pointer select-none flex items-center gap-2">
+                    ¿Agregar Propina?{" "}
+                    <Coins className="w-4 h-4 text-yellow-600" />
+                  </label>
+                </div>
+
+                {hasTip && (
+                  <div className="mt-4 grid grid-cols-1 gap-3 animate-in slide-in-from-top-2 duration-200">
+                    <div>
+                      <MoneyInput
+                        label="Monto Propina"
+                        value={tipAmount}
+                        onChange={setTipAmount}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                        Vía
+                      </label>
+                      <select
+                        value={tipMethod}
+                        onChange={(e) => setTipMethod(e.target.value)}
+                        className="w-full p-2 border border-yellow-300 rounded-lg bg-white text-sm font-medium text-gray-800 h-[52px]"
+                      >
+                        <option>Efectivo</option>
+                        <option>Yappy</option>
+                        <option>Tarjeta</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <ProductCart onTotalChange={setProductsTotal} value={cart} onChange={setCart} servicePrice={price} tipAmount={!isPending && hasTip ? tipAmount : 0} />
+          <p className="text-sm font-bold text-gray-600">Comisión del lavado: {(commission(washers.find(w => w.id === selectedWasherId)?.commissionPercentage, commissionPercent) * 100).toFixed(2)}%</p>
+          {isPending && <MoneyInput label="Precio previsto del lavado (opcional)" value={price} onChange={setPrice} />}
+          <HelpTip label="Sobre el cobro">Para cobrar se requiere una caja abierta. Los productos pendientes se reservan al guardar. El total de productos se suma al precio del lavado.</HelpTip>
+          {/* BOTÓN GUARDAR */}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`w-full py-4 mt-2 rounded-xl font-bold text-white shadow-lg transition flex items-center justify-center gap-2 text-lg ${isPending ? "bg-gray-800 hover:bg-black shadow-gray-500/30" : "bg-espuma-blue hover:bg-cyan-600 shadow-cyan-500/30"}`}
+          >
+            {loading ? (
+              "Guardando..."
+            ) : (
+              <>
+                <Save className="w-6 h-6" />{" "}
+                {isPending
+                  ? "Guardar Pendiente"
+                  : `Cobrar $${money(price + productsTotal + (hasTip ? tipAmount : 0)).toFixed(2)}`}
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

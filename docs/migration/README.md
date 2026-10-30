@@ -12,7 +12,7 @@ La documentación V2 actualizada exige una aplicación nueva con Auth, RBAC y mu
 
 1. `npm ci`.
 2. `npm run dev` y abrir `/migration`.
-3. Seleccionar `fixtures/migration/demo-snapshot.json` para probar con datos ficticios.
+3. Seleccionar `examples/migration/demo-snapshot.json` para probar con datos ficticios.
 4. Elegir los identificadores de organización y sede. Analizar la copia y descargar el diagnóstico.
 
 Funciona sin Firebase ni una Caja abierta. El JSON se procesa en el navegador; no se transmite a un servidor. No hay botón de importar. Sin configuración de emulador, las pantallas operativas quedan bloqueadas. El diagnóstico no contiene nombres/teléfonos de clientes, pero sí IDs/rutas de documentos y resúmenes financieros; trátelo como información interna.
@@ -22,7 +22,7 @@ Funciona sin Firebase ni una Caja abierta. El JSON se procesa en el navegador; n
 Copie `.env.example` a `.env.local`, reinicie el proceso y ejecute un emulador Firestore en 127.0.0.1:8080 usando un proyecto `demo-`, por ejemplo:
 
 ```sh
-firebase emulators:start --config tests/firebase.emulators.json --project demo-pulilavado-v2 --only firestore
+firebase emulators:start --config tests/config/firebase.emulators.json --project demo-pulilavado-v2 --only firestore
 npm run dev
 ```
 
@@ -31,7 +31,7 @@ Se requiere Firebase CLI compatible y Java 21 para el emulador utilizado por las
 ## Diagnóstico por terminal
 
 ```sh
-npm run migration:check -- fixtures/migration/demo-snapshot.json --organization demo-organizacion --branch principal
+npm run migration:check -- examples/migration/demo-snapshot.json --organization demo-organizacion --branch principal
 npm run migration:check -- migration-data/copia.json --organization empresa --branch centro --out migration-data/diagnostico.json
 ```
 

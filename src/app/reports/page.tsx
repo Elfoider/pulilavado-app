@@ -1,4 +1,4 @@
-import ReportsPanel from "@/components/ReportsPanel";
+import ReportsPanel from "@/features/reports/components/ReportsPanel";
 
 export default function ReportsPage() {
   return (

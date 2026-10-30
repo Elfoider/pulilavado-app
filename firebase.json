@@ -1,1 +1,5 @@
-{ "firestore": { "indexes": "firestore.indexes.json" } }
+{
+  "firestore": {
+    "indexes": "config/firebase/firestore.indexes.json"
+  }
+}

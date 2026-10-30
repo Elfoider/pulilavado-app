@@ -1,4 +1,4 @@
-import MovementsPanel from "@/components/MovementsPanel";
+import MovementsPanel from "@/features/cash/components/MovementsPanel";
 export default function Page() {
   return <MovementsPanel />;
 }

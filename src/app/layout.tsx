@@ -1,11 +1,11 @@
-import EnvironmentGate from "@/components/migration/EnvironmentGate";
+import EnvironmentGate from "@/app/providers/EnvironmentGate";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar"; // Importamos el sidebar
-import MobileNav from "@/components/MobileNav";
-import NotiStackWrapper from "@/components/NotiStackWrapper";
+import Sidebar from "@/shared/navigation/Sidebar"; // Importamos el sidebar
+import MobileNav from "@/shared/navigation/MobileNav";
+import NotiStackWrapper from "@/shared/providers/NotiStackWrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 

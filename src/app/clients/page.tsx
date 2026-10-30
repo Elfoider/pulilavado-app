@@ -1,5 +1,5 @@
 // src/app/clients/page.tsx
-import ClientsManager from "@/components/ClientsManager";
+import ClientsManager from "@/features/clients/components/ClientsManager";
 
 export default function ClientsPage() {
   return (
