@@ -1,3 +1,4 @@
+import EnvironmentGate from "@/components/migration/EnvironmentGate";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
@@ -48,7 +49,7 @@ export default function RootLayout({
             {/* 2. Contenido Principal Dinámico */}
             {/* El margen izquierdo (ml-64) deja espacio para el sidebar */}
             <main className="flex-1 md:ml-64 p-4 md:p-8 overflow-y-auto w-full">
-              {children}
+              <EnvironmentGate>{children}</EnvironmentGate>
             </main>
           </div>
         </NotiStackWrapper>

@@ -1,24 +1,19 @@
-// src/lib/firebase.ts
-import { getApp, getApps, initializeApp } from "firebase/app";
+import { getApps, initializeApp } from "firebase/app";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { migrationRuntime } from "./migration/runtime";
 
-// Define una interfaz para las variables de entorno para mayor seguridad (opcional)
-const firebaseConfig = {
-  apiKey: "AIzaSyCBaQcCu1YeHXoJYJ2qhWteg-wIChL8dOA",
-  authDomain: "mrespumasystem.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "mrespumasystem",
-  storageBucket: "mrespumasystem.firebasestorage.app",
-  messagingSenderId: "889894946879",
-  appId: "1:889894946879:web:b2d9864c85bd6ae375108a"
-};
-
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR === "true") {
-  if (!firebaseConfig.projectId.startsWith("demo-")) throw new Error("Use un proyecto demo- para el emulador.");
-  const runtime = globalThis as typeof globalThis & { __pulilavadoEmulatorConnected?: boolean };
-  if (!runtime.__pulilavadoEmulatorConnected) {
-    connectFirestoreEmulator(db, "127.0.0.1", 8080);
-    runtime.__pulilavadoEmulatorConnected = true;
-  }
+export const migrationEnvironment=migrationRuntime({
+  enabled:process.env.NEXT_PUBLIC_MIGRATION_SANDBOX,
+  legacyEmulatorFlag:process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATOR,
+  projectId:process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+});
+// No production keys, projects, databases or fallback in MigracionDevV2.
+const name=`pulilavado-migration-${migrationEnvironment.projectId}`;
+const app=getApps().find(app=>app.name===name) ?? initializeApp({projectId:migrationEnvironment.projectId,apiKey:"demo-migration",appId:"demo-migration"},name);
+export const db=getFirestore(app);
+const runtime=globalThis as typeof globalThis & {__migrationEmulatorConnected?:Set<string>};
+runtime.__migrationEmulatorConnected ??= new Set();
+if(!runtime.__migrationEmulatorConnected.has(name)){
+  connectFirestoreEmulator(db,migrationEnvironment.emulatorHost,migrationEnvironment.emulatorPort);
+  runtime.__migrationEmulatorConnected.add(name);
 }

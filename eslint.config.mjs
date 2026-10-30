@@ -11,6 +11,8 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".test-build/**",
+    ".migration-build/**",
+    "migration-data/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

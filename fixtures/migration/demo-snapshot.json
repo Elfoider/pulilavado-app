@@ -1,0 +1,329 @@
+{
+  "format": "pulilavado-snapshot-v1",
+  "source": {
+    "projectId": "demo-pulilavado",
+    "databaseId": "(default)"
+  },
+  "exportedAt": "2026-10-30T12:00:00Z",
+  "collections": {
+    "clients": [
+      {
+        "id": "demo-client",
+        "data": {
+          "name": "Cliente de demostración",
+          "phone": "",
+          "vehicleModel": "Auto demo"
+        }
+      }
+    ],
+    "washers": [
+      {
+        "id": "demo-washer",
+        "data": {
+          "name": "Lavador de demostración",
+          "active": true,
+          "commissionPercentage": 40
+        }
+      }
+    ],
+    "serviceCatalog": [
+      {
+        "id": "wash",
+        "data": {
+          "name": "Lavado demo",
+          "price": 12,
+          "active": true
+        }
+      }
+    ],
+    "settings": [
+      {
+        "id": "global",
+        "data": {
+          "defaultCommissionPercentage": 40
+        }
+      }
+    ],
+    "products": [],
+    "productCodes": [],
+    "services": [
+      {
+        "id": "demo-service",
+        "data": {
+          "clientName": "Cliente de demostración",
+          "washerId": "demo-washer",
+          "washerName": "Lavador de demostración",
+          "vehicle": {
+            "model": "Auto demo",
+            "color": "Blanco",
+            "bay": "1"
+          },
+          "paymentStatus": "paid",
+          "status": "completed",
+          "cashSessionId": "demo-cash",
+          "createdAt": {
+            "seconds": 1793100002,
+            "nanoseconds": 0
+          },
+          "products": [],
+          "serviceItems": [
+            {
+              "catalogId": "wash",
+              "name": "Lavado demo",
+              "basePrice": 12,
+              "unitPrice": 12
+            }
+          ],
+          "financials": {
+            "totalPrice": 12,
+            "servicePrice": 12,
+            "productsTotal": 0,
+            "paymentMethod": "Efectivo",
+            "payments": [
+              {
+                "method": "Efectivo",
+                "amount": 12
+              }
+            ],
+            "tipAmount": 0,
+            "tipMethod": null,
+            "washerEarnings": 4.8,
+            "businessEarnings": 7.2,
+            "commissionRate": 0.4
+          }
+        }
+      }
+    ],
+    "sales": [],
+    "cashSessions": [
+      {
+        "id": "demo-cash",
+        "data": {
+          "status": "closed",
+          "openingAmount": 65,
+          "balances": {
+            "Efectivo": 65,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "receipts": 12,
+          "tips": 0,
+          "expenses": 5,
+          "movementSequence": 5,
+          "openedAt": {
+            "seconds": 1793100001,
+            "nanoseconds": 0
+          },
+          "closedAt": {
+            "seconds": 1793100006,
+            "nanoseconds": 0
+          },
+          "countedAmount": 65,
+          "difference": 0
+        }
+      }
+    ],
+    "cashMovements": [
+      {
+        "id": "move-1",
+        "data": {
+          "sessionId": "demo-cash",
+          "kind": "opening",
+          "method": "Efectivo",
+          "amount": 65,
+          "referenceId": "demo-cash",
+          "description": "Movimiento de prueba",
+          "createdAt": {
+            "seconds": 1793100001,
+            "nanoseconds": 0
+          },
+          "sequence": 1,
+          "balancesBefore": {
+            "Efectivo": 0,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "balancesAfter": {
+            "Efectivo": 65,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          }
+        }
+      },
+      {
+        "id": "move-2",
+        "data": {
+          "sessionId": "demo-cash",
+          "kind": "service_payment",
+          "method": "Efectivo",
+          "amount": 12,
+          "referenceId": "demo-service",
+          "description": "Movimiento de prueba",
+          "createdAt": {
+            "seconds": 1793100002,
+            "nanoseconds": 0
+          },
+          "sequence": 2,
+          "balancesBefore": {
+            "Efectivo": 65,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "balancesAfter": {
+            "Efectivo": 77,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          }
+        }
+      },
+      {
+        "id": "move-3",
+        "data": {
+          "sessionId": "demo-cash",
+          "kind": "expense",
+          "method": "Efectivo",
+          "amount": -3,
+          "referenceId": "expense",
+          "description": "Movimiento de prueba",
+          "createdAt": {
+            "seconds": 1793100003,
+            "nanoseconds": 0
+          },
+          "sequence": 3,
+          "balancesBefore": {
+            "Efectivo": 77,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "balancesAfter": {
+            "Efectivo": 74,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          }
+        }
+      },
+      {
+        "id": "move-4",
+        "data": {
+          "sessionId": "demo-cash",
+          "kind": "payroll_advance",
+          "method": "Efectivo",
+          "amount": -2,
+          "referenceId": "vale",
+          "description": "Movimiento de prueba",
+          "createdAt": {
+            "seconds": 1793100004,
+            "nanoseconds": 0
+          },
+          "sequence": 4,
+          "balancesBefore": {
+            "Efectivo": 74,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "balancesAfter": {
+            "Efectivo": 72,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          }
+        }
+      },
+      {
+        "id": "move-5",
+        "data": {
+          "sessionId": "demo-cash",
+          "kind": "envelope_deposit",
+          "method": "Efectivo",
+          "amount": -7,
+          "referenceId": "deposit",
+          "description": "Movimiento de prueba",
+          "createdAt": {
+            "seconds": 1793100005,
+            "nanoseconds": 0
+          },
+          "sequence": 5,
+          "balancesBefore": {
+            "Efectivo": 72,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          },
+          "balancesAfter": {
+            "Efectivo": 65,
+            "Yappy": 0,
+            "Tarjeta": 0,
+            "Transferencia": 0
+          }
+        }
+      }
+    ],
+    "cashAdvances": [
+      {
+        "id": "vale",
+        "data": {
+          "washerId": "demo-washer",
+          "washerName": "Lavador de demostración",
+          "amount": 2,
+          "sessionId": "demo-cash",
+          "day": "2026-10-27",
+          "createdAt": {
+            "seconds": 1793100004,
+            "nanoseconds": 0
+          }
+        }
+      }
+    ],
+    "cashEnvelopes": [
+      {
+        "id": "2026-10-27",
+        "data": {
+          "day": "2026-10-27",
+          "weekStart": "2026-10-27",
+          "initialAmount": 0,
+          "deposited": 7,
+          "spent": 0,
+          "toCash": 0,
+          "balance": 7,
+          "revision": 1
+        }
+      }
+    ],
+    "envelopeMovements": [
+      {
+        "id": "deposit",
+        "data": {
+          "envelopeDay": "2026-10-27",
+          "day": "2026-10-27",
+          "kind": "deposit",
+          "amount": 7,
+          "balanceBefore": 0,
+          "balanceAfter": 7,
+          "sessionId": "demo-cash",
+          "createdAt": {
+            "seconds": 1793100005,
+            "nanoseconds": 0
+          }
+        }
+      }
+    ],
+    "inventoryMovements": [],
+    "cashControl": [],
+    "treasuryControl": [
+      {
+        "id": "current",
+        "data": {
+          "revision": 2
+        }
+      }
+    ]
+  }
+}

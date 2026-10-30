@@ -1,0 +1,26 @@
+name: Migration V2 checks
+on:
+  push:
+    branches: [MigracionDevV2]
+  pull_request:
+    branches: [MigracionDevV2]
+permissions:
+  contents: read
+jobs:
+  isolated-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_MIGRATION_SANDBOX: "false"
+      NEXT_PUBLIC_USE_FIREBASE_EMULATOR: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm test
+      - run: npm run migration:check -- fixtures/migration/demo-snapshot.json --organization demo-organizacion --branch principal
+      - run: npm run build

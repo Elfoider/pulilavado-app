@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 export const menuItems = [
+  { name: "Migración V2", href: "/migration", icon: Settings },
   { name: "Tablero Principal", href: "/", icon: LayoutDashboard },
   { name: 'Historial', href: '/history', icon: History },
   // { name: "Nuevo Servicio", href: "/new", icon: PlusCircle },
@@ -45,6 +46,6 @@ export const formatMoney = (amount: number) => {
   }).format(amount);
 };
 
-export const versionSoft = "v1.5.3 - Efectivo y sobres";
+export const versionSoft = "V2 dev · Migración fase 1";
 
 

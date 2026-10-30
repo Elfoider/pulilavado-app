@@ -1,3 +1,16 @@
+# MigracionDevV2 — preparación de migración
+
+Esta rama contiene la **fase 1 de migración**. Producción permanece en `master` (1.5.3). No despliegue esta rama en el backend productivo: las pantallas operativas están limitadas al emulador local.
+
+- [Análisis y plan de fases](docs/migration/ANALISIS_Y_PLAN.md)
+- [Uso del centro de migración y herramienta local](docs/migration/README.md)
+- [Decisión de arquitectura](docs/migration/ADR-001.md)
+- [Validación de la entrega](docs/migration/VALIDACION.md)
+
+Abra `/migration` para revisar el ejemplo ficticio. No se importan datos ni se conecta a la base del proyecto Pulix V2. Las instrucciones originales siguientes se conservan como referencia histórica; para esta rama prevalece la guía de migración.
+
+---
+
 # Sistema Pulilavado / Mr. Espuma
 
 Actualización 1.4.0 del sistema existente: comisiones individuales, inventario, venta de productos independiente y dentro de los servicios, y caja con apertura/cierre y conciliación.
