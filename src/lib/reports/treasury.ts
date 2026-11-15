@@ -2,6 +2,7 @@ import { CashMovement, money } from "../operations/model";
 import {
   addDays,
   CashAdvance,
+  effectiveCashAdvance,
   CashEnvelope,
   EnvelopeMovement,
   isEnvelope,
@@ -89,8 +90,9 @@ export function summarizeTreasury(
     else if (m.kind !== "opening")
       throw new Error("Destino del retiro desconocido.");
   }
+  const effectiveAdvances = advances.map(effectiveCashAdvance).filter((advance): advance is CashAdvance => advance !== null);
   if (
-    advances.some(
+    effectiveAdvances.some(
       (a) => !a.washerId || !Number.isFinite(a.amount) || a.amount <= 0,
     )
   )
@@ -101,7 +103,7 @@ export function summarizeTreasury(
     cashReceipts,
     cashOutgoings,
     additionalFunding,
-    advances: money(advances.reduce((s, a) => s + a.amount, 0)),
+    advances: money(effectiveAdvances.reduce((s, a) => s + a.amount, 0)),
     netGenerated: money(cashReceipts - cashOutgoings - envelopeExpenses),
     deposited,
     envelopeExpenses,
@@ -113,6 +115,6 @@ export function summarizeTreasury(
         (a.createdAt?.seconds ?? 0) - (b.createdAt?.seconds ?? 0) ||
         a.id.localeCompare(b.id),
     ),
-    advanceRows: advances,
+    advanceRows: effectiveAdvances,
   };
 }

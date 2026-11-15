@@ -5,7 +5,7 @@ import Link from "next/link";
 import { businessDay, weekOf } from "@/lib/operations/treasury-model";
 import { METHODS } from "@/lib/operations/model";
 import { loadCashReport } from "@/lib/reports/loadCash";
-import { type DetailedMovement, type PeriodCash, movementKinds } from "@/lib/reports/cash";
+import { type DetailedMovement, type PeriodCash, movementLabel } from "@/lib/reports/cash";
 import { formatMoney } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
@@ -62,7 +62,7 @@ export default function MovementsPanel() {
           <table className="w-full text-sm"><thead className="bg-slate-100 text-left"><tr>{["Fecha y hora", "Movimiento / motivo", "Método", "Monto", "Saldo antes", "Saldo después", "Detalle"].map(title=><th key={title} className="p-3 whitespace-nowrap">{title}</th>)}</tr></thead>
             <tbody>{state.rows.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE).map(row=><tr key={row.id} className="border-t align-top">
               <td className="p-3 whitespace-nowrap">{row.createdAt ? new Date(row.createdAt.seconds*1000).toLocaleString("es-VE",{timeZone:"America/Caracas"}) : "Sin fecha"}</td>
-              <td className="p-3 min-w-56"><p className="font-semibold">{movementKinds[row.kind] ?? row.kind}</p><p className="text-gray-600 whitespace-pre-wrap">{row.description}</p>{row.washerName && <p className="text-cyan-800">Lavador: {row.washerName}</p>}</td>
+              <td className="p-3 min-w-56"><p className="font-semibold">{movementLabel(row)}</p><p className="text-gray-600 whitespace-pre-wrap">{row.description}</p>{row.washerName && <p className="text-cyan-800">Lavador: {row.washerName}</p>}</td>
               <td className="p-3">{row.method}</td><td className={`p-3 whitespace-nowrap font-semibold ${row.amount<0?"text-red-700":"text-emerald-700"}`}>{formatMoney(row.amount)}</td>
               <td className="p-3 whitespace-nowrap">{row.balancesBefore ? formatMoney(row.balancesBefore[row.method]) : "No disponible"}</td>
               <td className="p-3 whitespace-nowrap">{row.balancesAfter ? formatMoney(row.balancesAfter[row.method]) : "No disponible"}</td>

@@ -21,6 +21,7 @@ function renderCash(data) {
   const localRequire = (name) => {
     if (name === "@/lib/useCollection")
       return { useCollection: () => ({ data, error: "", loading: false }) };
+    if (name === "@/lib/operations/cash-correction") return require("../.test-build/operations/cash-correction.js");
     if (name === "@/lib/operations/model") return model;
     if (name === "@/lib/operations")
       return { newId: () => "test-id", operations: {} };

@@ -27,3 +27,7 @@ La versión 1.3.9 incorpora el reporte financiero con gráficas, exportación a 
 La versión 1.3.10 corrige la estructura Open XML de la exportación para evitar que Excel repare o descarte la hoja Resumen.
 
 La versión 1.4.0 incorpora vales por lavador con descuento en nómina y el control de sobres diarios y efectivo semanal de martes a lunes. Instrucciones: [VALES_Y_SOBRES.md](VALES_Y_SOBRES.md).
+
+## Correcciones de Caja
+
+Consulta la [guía para corregir movimientos y habilitar la clave](CORRECCIONES_DE_CAJA.md).
