@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { METHODS } from "../operations/model";
-import { reportCashView, FinancialReport, movementKinds } from "./cash";
+import { reportCashView, FinancialReport, movementLabel } from "./cash";
 const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 export function financialExcel(report: FinancialReport): Uint8Array {
   const wb = XLSX.utils.book_new();
@@ -35,7 +35,7 @@ export function financialExcel(report: FinancialReport): Uint8Array {
   if(report.advancesTotal!==undefined) for(const range of ["A34:E34","F34:H34","A37:E37","F37:H37"]) summary["!merges"]!.push(XLSX.utils.decode_range(range));
   for (const addr of Object.keys(summary)) { if (addr.startsWith("!")) continue; if (summary[addr].t === "n") summary[addr].z = '"$"#,##0.00;[Red]("$"#,##0.00)'; }
   const details = [["Fecha", "Orden", "Tipo", "Método", "Monto", "Saldo método antes", "Saldo método después", "Efectivo antes", "Efectivo después", "Yappy antes", "Yappy después", "Tarjeta antes", "Tarjeta después", "ACH antes", "ACH después", "Detalle", "Referencia", "ID movimiento", "Saldos", "ID de caja"],
-    ...report.movements.map(m => [m.createdAt ? (m.createdAt.seconds - 4 * 3600) / 86400 + 25569 : null, m.sequence ?? null, movementKinds[m.kind] ?? m.kind, m.method, m.amount, m.balancesBefore?.[m.method] ?? null, m.balancesAfter?.[m.method] ?? null, ...METHODS.flatMap(method => [m.balancesBefore?.[method] ?? null, m.balancesAfter?.[method] ?? null]), m.description, m.referenceId, m.id, m.balanceSource, m.sessionId])];
+    ...report.movements.map(m => [m.createdAt ? (m.createdAt.seconds - 4 * 3600) / 86400 + 25569 : null, m.sequence ?? null, movementLabel(m), m.method, m.amount, m.balancesBefore?.[m.method] ?? null, m.balancesAfter?.[m.method] ?? null, ...METHODS.flatMap(method => [m.balancesBefore?.[method] ?? null, m.balancesAfter?.[method] ?? null]), m.description, m.referenceId, m.id, m.balanceSource, m.sessionId])];
   const movements = XLSX.utils.aoa_to_sheet(details);
   movements["!cols"] = details[0].map((_, i) => ({ wch: i === 0 ? 22 : i >= 15 ? 32 : i === 2 ? 23 : 19 }));
   movements["!autofilter"] = { ref: `A1:T${details.length}` };

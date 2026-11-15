@@ -8,6 +8,12 @@ export const movementKinds: Record<string, string> = {
   service_correction_tip: "Reversión propina", service_refund: "Anulación servicio",
   service_refund_tip: "Devolución propina",
 };
+export function movementLabel(row: CashMovement) {
+  const kind = movementKinds[row.kind] ?? row.kind;
+  if (row.correctsMovementId) return (row.correctionMode === "void" ? "Anulación · " : "Ajuste · ") + kind;
+  if (row.correctionId) return kind + (row.correctionMode === "void" ? " · Anulado" : " · Corregido");
+  return kind;
+}
 export type DetailedMovement = CashMovement & { balanceSource: "Registrado" | "Reconstruido" | "No disponible" };
 const validBalances = (value: unknown): value is CashSession["balances"] => !!value && typeof value === "object" && METHODS.every(m => typeof (value as CashSession["balances"])[m] === "number" && Number.isFinite((value as CashSession["balances"])[m]));
 const entryOrder: Record<string, number> = {service_correction: 0, service_correction_tip: 1, service_payment: 2, service_payment_tip: 3, service_refund: 4, service_refund_tip: 5};

@@ -275,3 +275,16 @@ test('activity on finance panel includes unpaid services and excludes cancelled 
  assert.equal(panel.props.activity.vehicles,3);assert.equal(panel.props.activity.services,4);assert.equal(panel.props.activity.rows.find(row=>row.id==='catalog:wash').count,2);assert.equal(panel.props.activity.rows.find(row=>row.id==='custom').count,1);
  assert.match(h.textOf(h.render()),/Total a pagar: \$7\.00/);
 });
+
+test("payroll excludes a voided duplicate and uses the corrected amount of a remaining advance", async () => {
+  const h = harness([service("a", "Ana", 50)], undefined, [
+    {id:"valid", washerId:"a", washerName:"Ana", amount:20, correctedAmount:15, correctionId:"adjusted", day:"2026-11-15", description:"Vale conservado"},
+    {id:"duplicate", washerId:"a", washerName:"Ana", amount:20, correctedAmount:0, correctionId:"voided", day:"2026-11-15", description:"Vale duplicado"},
+  ]);
+  await h.refresh();
+  h.button("Reporte de Pago de Nómina").props.onClick();
+  const body = h.tables[0].body;
+  assert.equal(body[0][3], "$15.00");
+  assert.equal(body[0][4], "$35.00");
+  assert.ok(!JSON.stringify(body).includes("Vale duplicado"));
+});

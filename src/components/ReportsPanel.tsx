@@ -28,7 +28,7 @@ import { loadCashReport } from "@/lib/reports/loadCash";
 import { financialPDF } from "@/lib/reports/pdf";
 import { financialExcel, saveExcel } from "@/lib/reports/excel";
 import { cashMovementBreakdown, type PeriodCash, type FinancialReport } from "@/lib/reports/cash";
-import { addDays, businessDay, CashAdvance, dayStart, netPayroll, weekOf } from "@/lib/operations/treasury-model";
+import { addDays, businessDay, CashAdvance, dayStart, effectiveCashAdvance, netPayroll, weekOf } from "@/lib/operations/treasury-model";
 import { loadTreasuryReport } from "@/lib/reports/loadTreasury";
 import { paymentParts } from "@/lib/operations/model";
 import { type TreasuryReport } from "@/lib/reports/treasury";
@@ -197,7 +197,8 @@ export default function ReportsPage() {
       const advanceSnap = await getDocs(query(collection(db, "cashAdvances"), where("createdAt", ">=", Timestamp.fromDate(startDate)), where("createdAt", "<=", Timestamp.fromDate(endDate))));
       const periodAdvances: CashAdvance[] = [];
       advanceSnap.forEach(doc => {
-        const advance = { ...doc.data(), id: doc.id } as CashAdvance;
+        const advance = effectiveCashAdvance({ ...doc.data(), id: doc.id } as CashAdvance);
+        if (!advance) return;
         if (!advance.washerId || !Number.isFinite(advance.amount) || advance.amount <= 0) throw new Error("Hay vales con datos inválidos.");
         periodAdvances.push(advance);
         if (!washerMap[advance.washerId]) washerMap[advance.washerId] = {washerId: advance.washerId, washerName: advance.washerName, count: 0, totalPay: 0, advances: 0, netPay: 0, excess: 0};

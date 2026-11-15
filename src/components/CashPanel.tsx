@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import CashCorrectionForm from "./CashCorrectionForm";
+import { cashCorrectable } from "@/lib/operations/cash-correction";
 import CashSavings from "./CashSavings";
 import HelpTip from "./HelpTip";
 import SectionLink from "./SectionLink";
@@ -18,7 +20,7 @@ import {
 import { newId, operations } from "@/lib/operations";
 import {
   collection,
-  getDocs,
+  getDocsFromServer,
   query,
   where,
   orderBy,
@@ -28,7 +30,7 @@ import {
   DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { movementKinds } from "@/lib/reports/cash";
+import { movementLabel } from "@/lib/reports/cash";
 
 export default function CashPanel() {
   const {
@@ -386,20 +388,21 @@ export default function CashPanel() {
               </button>
             </form></details>
           )}
-          <CashMovements key={session.id} sessionId={session.id} />
+          <CashMovements key={session.id} sessionId={session.id} canCorrect={session.status === "open" && !blocked} />
         </>
       )}
     </div>
   );
 }
 
-function CashMovements({ sessionId }: { sessionId: string }) {
+function CashMovements({ sessionId, canCorrect }: { sessionId: string; canCorrect: boolean }) {
   const [rows, setRows] = useState<CashMovement[]>([]),
     [cursor, setCursor] = useState<QueryDocumentSnapshot<DocumentData>>(),
     [more, setMore] = useState(true),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  async function load() {
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  async function load(reset = false) {
     setBusy(true);
     try {
       const base = [
@@ -407,15 +410,15 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         orderBy("createdAt", "desc"),
         limit(100),
       ];
-      const snap = await getDocs(
+      const snap = await getDocsFromServer(
         query(
           collection(db, "cashMovements"),
           ...base,
-          ...(cursor ? [startAfter(cursor)] : []),
+          ...(!reset && cursor ? [startAfter(cursor)] : []),
         ),
       );
       setRows((prev) => [
-        ...prev,
+        ...(reset ? [] : prev),
         ...snap.docs.map((d) => ({ ...d.data(), id: d.id }) as CashMovement),
       ]);
       setCursor(snap.docs.at(-1));
@@ -432,6 +435,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5">
       <h2 className="text-xl font-bold mb-3">Movimientos de esta caja</h2>
+      {notice && <p role="status" className="mb-3 text-emerald-800">{notice}</p>}
       {error && (
         <p role="alert" className="text-red-700">
           {error}
@@ -458,7 +462,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
                     ? new Date(m.createdAt.seconds * 1000).toLocaleString()
                     : "..."}
                 </td>
-                <td className="p-3">{movementKinds[m.kind] ?? m.kind}</td>
+                <td className="p-3">{movementLabel(m)}</td>
                 <td className="p-3">{m.method}</td>
                 <td className="p-3 font-bold">${m.amount.toFixed(2)}</td>
                 {[m.balancesBefore?.[m.method], m.balancesAfter?.[m.method], m.balancesBefore?.Efectivo, m.balancesAfter?.Efectivo].map((value, index) => <td key={index} className="p-3 whitespace-nowrap">{typeof value === "number" && Number.isFinite(value) ? `$${value.toFixed(2)}` : "No registrado"}</td>)}
@@ -467,12 +471,18 @@ function CashMovements({ sessionId }: { sessionId: string }) {
                   <p className="text-xs text-gray-400 break-all">
                     {m.referenceId}
                   </p>
+                  {canCorrect && !busy && cashCorrectable(m.kind) && !m.correctionId && !m.correctsMovementId &&
+                    <CashCorrectionForm movement={m} onSaved={() => {
+                      setNotice("Corrección guardada. Vuelva a consultar el reporte de nómina si ya estaba abierto.");
+                      void load(true);
+                    }} />}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      {rows.length > 0 && <button type="button" disabled={busy} onClick={() => void load(true)} className="mt-4 mr-4 text-cyan-700 disabled:opacity-50">Actualizar movimientos</button>}
       {more && (
         <button
           disabled={busy}
@@ -487,8 +497,7 @@ function CashMovements({ sessionId }: { sessionId: string }) {
         </button>
       )}
       <HelpTip label="Sobre este historial">
-        Los saldos antes y después se registran desde esta versión. Los movimientos anteriores conservan sus datos. Los movimientos se cargan en grupos de 100. Vuelva a seleccionar la caja
-        para actualizar el detalle.
+        Los saldos antes y después se registran desde esta versión. Los movimientos anteriores conservan sus datos. Los movimientos se cargan en grupos de 100. Puede actualizar el historial con el botón Actualizar movimientos.
       </HelpTip>
     </section>
   );

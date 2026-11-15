@@ -54,6 +54,9 @@ export interface CashMovement {
   washerId?: string;
   washerName?: string;
   envelopeDay?: string;
+  correctionId?: string;
+  correctsMovementId?: string;
+  correctionMode?: "void" | "amount";
   sequence?: number;
   balancesBefore?: Record<Method, number>;
   balancesAfter?: Record<Method, number>;

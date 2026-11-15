@@ -30,7 +30,15 @@ export function weekOf(day: string) {
 export function dayStart(day: string) {
   return new Date(dateDay(day) + "T00:00:00-04:00");
 }
+/** Original amount stays intact for review; payroll consumes the effective amount. */
+export function effectiveCashAdvance(advance: CashAdvance): CashAdvance | null {
+  if (advance.correctedAmount == null) return advance;
+  if (!advance.correctionId || !Number.isFinite(advance.correctedAmount) || advance.correctedAmount < 0) throw new Error("Hay una corrección de vale inválida.");
+  return advance.correctedAmount === 0 ? null : { ...advance, amount: advance.correctedAmount };
+}
 export interface CashAdvance {
+  correctionId?: string;
+  correctedAmount?: number;
   id: string;
   washerId: string;
   washerName: string;
